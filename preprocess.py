@@ -23,10 +23,10 @@ pre_survey.rename(columns={"Q10_1": "mood", "Q7": "prolific_id"}, inplace=True)
 post_survey.rename(columns={"Q7":"prolific_id", "Q9": "interacted", "Q6_1":"familiar_tech", "Q6_2":"use_freq", "Q6_3":"get_help", "QID1_1":"explain_cxt", "QID1_2":"cxt_flow", "QID1_3": "reply_btn", "QID1_4": "feel_control", "QID1_5":"ling_cxt", "QID1_6": "seman_cxt", "QID1_7": "attent_check1", "QID1_8": "cogn_cxt", "Q10": "comment_contextbot", "Q11": "attent_check2", "Q4_1":"satis_score", "Q5":"comment_system", "Q12":"preprogrammed"}, inplace=True)
 
 
+
 def link_surveys_table(table, pre_survey, post_survey):
     pre_survey_table = pd.merge(table, pre_survey, on="prolific_id", how="left")
     pre_post_survey_table = pd.merge(pre_survey_table, post_survey, on="prolific_id", how="left")
-
     return pre_post_survey_table
 
 
@@ -40,7 +40,6 @@ def link_tables():
 
     worker_time_message_behavior = pd.merge(worker_time_message, behavior_df, left_on="id", right_on="w_id", how="outer").drop("w_id", axis=1)
     worker_time_message_behavior.rename(columns={"time_stamp": "behavior_time"}, inplace=True)
-
     return worker_time_message_behavior
 
 
@@ -153,8 +152,14 @@ def preprocess_tables_surveys():
     # convert time type to seconds
     total_df["spent_time"] = total_df["spent_time"].dt.total_seconds()
 
-    # remove a record with repeated end_time
-    total_df = total_df.sort_values('spent_time').drop_duplicates(['id', "start_time", "msg_status", "worker_utterance"], keep='last')
+    # remove a record with twice submission (two ended time), and only keep the max spent_time as the final submission
+    # id_list = list(total_df["id"].unique())
+    # for id in id_list:
+    #     if len(total_df[total_df["id"]==id]["spent_time"].drop_duplicates()) > 1:
+    #         print(id)
+    total_df.drop(index=[1528], inplace=True)
+    # this is a mistake (maybe influence the descriptive statistics)
+    # total_df = total_df.sort_values('spent_time').drop_duplicates(['id', "start_time", "msg_status", "worker_utterance"], keep='last')
 
     # no NaN values exist in the time spent table
     print("\nTotal number of final participants: ", len(total_df["id"].unique()))
@@ -173,7 +178,9 @@ def eval_ueq(total_df):
 if __name__ == "__main__":
     # preprocess the table and surveys, get the final data
     total_df = preprocess_tables_surveys()
-    print(total_df.tail())
+    print("Tail of final df: ", total_df.tail())
+    total_df.to_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/final_df.csv")
+
 
     # calculate the user experience score, keep the id, prolific_id, stage, spent_time, interacted, Q2_1 to Q2_8, preprogrammed
 
