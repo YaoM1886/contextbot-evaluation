@@ -185,20 +185,27 @@ def behavior_satis_df(total_df):
     b_name_df.reset_index(inplace=True)
     b_name_df.rename(columns={"index": "id"}, inplace=True)
 
+
     # count the number of finishing each dimension of context
 
     # check if each dimension of cxt was interacted with
     cxt_type_dict = {"interacted_social_cxt":["b_name_Hmm...I think so.", "b_name_Sure, let us begin!"], "interacted_ready_ling_cxt":["b_name_Yes, very clear!", "b_name_Well...I still don't understand."],
                      "interacted_ling_cxt":["b_name_Clicked the back button", "b_name_Clicked the linked text", "b_name_Clicked the next button"],
                      "interacted_seman_cxt":["b_name_Not really...I am confused.", "b_name_Yes, I'm totally aware now!"],
-                     "interacted_ready_cog_cxt":["b_name_Yes, I am ready!", "b_name_User's intention", "b_name_Previous coach's intention"],
+                     "interacted_ready_cog_cxt":['b_name_Yes, I am ready!', 'b_name_Okay, share what you have with me.'],
                      "interacted_cog_cxt":["b_name_Your intention", "b_name_User's intention", "b_name_Previous coach's intention"], "interacted_prompt_cxt":["b_name_Wow, I think I know enough now!", "b_name_Okay, anything else?"]}
+
     for cxt_type, cxt_option in cxt_type_dict.items():
-        b_name_df.loc[(b_name_df[cxt_option[0]]>0)|(b_name_df[cxt_option[1]]>0), cxt_type] = 1
-        b_name_df.loc[(b_name_df[cxt_option[0]]==0)&(b_name_df[cxt_option[1]]==0), cxt_type] = 0
+        if len(cxt_option) == 2:
+            b_name_df.loc[(b_name_df[cxt_option[0]]>0)|(b_name_df[cxt_option[1]]>0), cxt_type] = 1
+            b_name_df.loc[(b_name_df[cxt_option[0]]==0)&(b_name_df[cxt_option[1]]==0), cxt_type] = 0
+        else:
+            b_name_df.loc[(b_name_df[cxt_option[0]]>0)|(b_name_df[cxt_option[1]]>0) |(b_name_df[cxt_option[2]]>0), cxt_type] = 1
+            b_name_df.loc[(b_name_df[cxt_option[0]]==0)&(b_name_df[cxt_option[1]]==0)&(b_name_df[cxt_option[2]]==0), cxt_type] = 0
+
 
     # check the workers who finished the whole interaction
-    b_name_df.loc[(b_name_df["ready_for_any_cxt"]>0)&(b_name_df["interacted_social_cxt"]>0)&(b_name_df["interacted_seman_cxt"]>0) & (b_name_df["interacted_cog_cxt"]>0) & (b_name_df["interacted_prompt_cxt"]>0), "interacted_all_cxt"] = 1
+    b_name_df.loc[(b_name_df["interacted_social_cxt"]>0)&(b_name_df["interacted_ready_ling_cxt"]>0) & (b_name_df["interacted_ling_cxt"]) &(b_name_df["interacted_seman_cxt"]>0) & (b_name_df[ "interacted_ready_cog_cxt"]>0)& (b_name_df["interacted_cog_cxt"]>0) & (b_name_df["interacted_prompt_cxt"]>0), "interacted_all_cxt"] = 1
 
     # check the workers who only clicked the icon
     b_name_df.loc[(b_name_df["b_name_Clicked the ContextBot Icon"]>0), "only_bot_icon"] = 1
@@ -216,40 +223,33 @@ def behavior_satis_df(total_df):
     # id_your_intention = b_name_df[b_name_df["b_name_Your intention"]>0]["id"].values
 
     def boxplot_cxt_satis(b_name_df):
-        cxt_type_dict = ["only_bot_icon", "ready_for_any_cxt", "interacted_social_cxt"]
+        cxt_type_dict = ["only_bot_icon", "interacted_social_cxt", "interacted_ready_ling_cxt"]
         box_dict = dict.fromkeys(cxt_type_dict)
         for i in range(0, len(cxt_type_dict)-1):
             box_dict[cxt_type_dict[i]] = list(b_name_df[b_name_df["id"].isin(b_name_df[(b_name_df[cxt_type_dict[i]]==1) & (b_name_df[cxt_type_dict[i+1]]==0)]["id"])]["satis_score"].values)
 
-        box_dict["interacted_social_cxt"] = list(b_name_df[b_name_df["id"].isin(b_name_df[(b_name_df["interacted_ling_cxt"]==0) & (b_name_df["interacted_seman_cxt"]==0) & (b_name_df["interacted_social_cxt"]==1)]["id"])]["satis_score"].values)
-        box_dict["interacted_noling_cxt"] = list(b_name_df[b_name_df["id"].isin(b_name_df[(b_name_df["interacted_ling_cxt"]==0) & (b_name_df["interacted_seman_cxt"]==0) & (b_name_df["interacted_social_cxt"]==1)]["id"])]["satis_score"].values)
+        box_dict["soc_ling"] = list(b_name_df[b_name_df["id"].isin(b_name_df[(b_name_df["interacted_ling_cxt"]==1) & (b_name_df["interacted_seman_cxt"]==0)]["id"])]["satis_score"].values)
+        box_dict["soc_ling_seman"] = list(b_name_df[b_name_df["id"].isin(b_name_df[(b_name_df["interacted_ling_cxt"]==1) & (b_name_df["interacted_cog_cxt"]==0) & (b_name_df["interacted_seman_cxt"]==1)]["id"])]["satis_score"].values)
+        box_dict["soc_ling_seman_cog"] = list(b_name_df[b_name_df["id"].isin(b_name_df[(b_name_df["interacted_ling_cxt"]==1) & (b_name_df["interacted_cog_cxt"]==1) & (b_name_df["interacted_prompt_cxt"]==0)]["id"])]["satis_score"].values)
+        box_dict["all_cxt"] = list(b_name_df[b_name_df["id"].isin(b_name_df[(b_name_df["interacted_all_cxt"]==1)]["id"])]["satis_score"].values)
 
-        box_dict["interacted_cog_cxt"] = list(b_name_df[b_name_df["id"].isin(b_name_df[(b_name_df["interacted_ling_cxt"]==1) & (b_name_df["interacted_cog_cxt"]==1) & (b_name_df["interacted_prompt_cxt"]==0)]["id"])]["satis_score"].values)
+        del box_dict["interacted_ready_ling_cxt"]
 
-        box_dict["interacted_noling_prompt_cxt"] = list(b_name_df[b_name_df["id"].isin(b_name_df[(b_name_df["interacted_ling_cxt"]==0) & (b_name_df["interacted_prompt_cxt"]==1)]["id"])]["satis_score"].values)
+        df = pd.DataFrame({key:pd.Series(value) for key, value in box_dict.items() })
 
-        box_dict["interacted_all_cxt"] = list(b_name_df[b_name_df["id"].isin(b_name_df[(b_name_df["interacted_all_cxt"]==1)]["id"])]["satis_score"].values)
+        df.boxplot(grid=False)
+        plt.xticks(rotation=10)
+        plt.xlabel("interacted context type")
+        plt.ylabel("satisfaction score")
 
-        print(box_dict)
-
-        count = 0
-        for item in box_dict.values():
-            count+=len(item)
-        print(count)
-
+        plt.show()
 
 
     b_name_df = pd.merge(response_after_help_df.loc[:, ["id", "satis_score", "stage"]], b_name_df, on=["id"], how="inner").drop_duplicates()
     b_name_df["interacted_all_cxt"].fillna(0, inplace=True)
-    box_dict = boxplot_cxt_satis(b_name_df)
+    boxplot_cxt_satis(b_name_df)
 
-    # print(box_dict)
-    # print(b_name_df[(b_name_df["interacted_cog_cxt"]==0) & (b_name_df["interacted_prompt_cxt"]==1)])
-    # df = pd.DataFrame({key:pd.Series(value) for key, value in box_dict.items() })
-    #
-    # df.boxplot(grid=False)
-    #
-    # plt.show()
+
 
 
 
