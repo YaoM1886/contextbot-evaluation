@@ -3,8 +3,11 @@ import matplotlib.pyplot as plt
 import re
 import numpy as np
 import seaborn as sns
+from statistic_test_ueq import within_group_test
+
 
 pd.set_option("display.max_rows", None)
+pd.set_option("display.max_columns", None)
 
 
 def extract_conditional_df(total_df, condition_dict, condition_boxes):
@@ -13,23 +16,22 @@ def extract_conditional_df(total_df, condition_dict, condition_boxes):
     for key in condition_dict.keys():
         for condition in condition_boxes:
             # for within task type and interacted types
-            condition_l = list(total_df.loc[(total_df["stage"]=="main_history"+"_"+key) & (total_df["interacted"] == condition)].drop_duplicates(subset=["id"])["spent_time"].values)
-            condition_dict[key].append(condition_l)
+            # condition_l = list(total_df.loc[(total_df["stage"]=="main_non_MI"+"_"+key) & (total_df["actual_interacted"] == condition)].drop_duplicates(subset=["id"])["mean_task_load"].values)
 
-            # for task types
-            # condition_l = list(total_df.loc[total_df["stage"]=="main_"+key+"_"+condition].drop_duplicates(subset=["id"])["spent_time"].values)
+            #  for task types
+            condition_l = list(total_df.loc[((total_df["stage"]=="main_MI_"+key) | (total_df["stage"]=="main_non_MI"+"_"+key)) & (total_df["interacted"] == condition)].drop_duplicates(subset=["id"])["mean_pragmatic"].values)
+            condition_dict[key].append(condition_l)
 
     return condition_dict
 
 
-def boxplot_stage_time(condition_dict, labels, colors):
-
+def boxplot_three_groups_two_each(condition_dict, labels, colors, ylabel):
     # boxplot of the nine stages and their spent time of the task
-    x_positions_fmt = ["history-early", "history-half", "history-late"]
+    x_positions_fmt = ["Early", "Half", "Late*"]
 
-    bplot = plt.boxplot(condition_dict["early"], labels=labels, positions=(1, 1.4), widths=0.3, patch_artist=True)
-    bplot2 = plt.boxplot(condition_dict["half"], labels=labels, positions=(2.5, 2.9), widths=0.3, patch_artist=True)
-    bplot3 = plt.boxplot(condition_dict["late"], labels=labels, positions=(4, 4.4), widths=0.3, patch_artist=True)
+    bplot = plt.boxplot(condition_dict["early"], labels=labels, positions=(1, 1.4), widths=0.3, patch_artist=True, showmeans=True, meanprops={'marker':'o', "markerfacecolor":"black", "markeredgecolor": "black"}, sym="+")
+    bplot2 = plt.boxplot(condition_dict["half"], labels=labels, positions=(2.5, 2.9), widths=0.3, patch_artist=True, showmeans=True, meanprops={'marker':'o', "markerfacecolor":"black", "markeredgecolor": "black"}, sym="+")
+    bplot3 = plt.boxplot(condition_dict["late"], labels=labels, positions=(4, 4.4), widths=0.3, patch_artist=True, showmeans=True, meanprops={'marker':'o', "markerfacecolor":"black", "markeredgecolor": "black"}, sym="+")
 
 
     for bplot in (bplot, bplot2, bplot3):
@@ -40,7 +42,27 @@ def boxplot_stage_time(condition_dict, labels, colors):
 
     plt.xticks([i+0.8/2 for i in x_positions], x_positions_fmt)
 
-    plt.ylabel("execution time (seconds)")
+    plt.ylabel(ylabel)
+    plt.legend(bplot["boxes"], labels, loc="best")
+    plt.show()
+
+def boxplot_two_groups_two_each(condition_dict, labels, colors, ylabel):
+    # boxplot of the nine stages and their spent time of the task
+    x_positions_fmt = ["MI*", "Non-MI*"]
+
+    bplot = plt.boxplot(condition_dict["MI"], labels=labels, positions=(1, 1.4), widths=0.3, patch_artist=True, showmeans=True, meanprops={'marker':'o', "markerfacecolor":"black", "markeredgecolor": "black"}, sym="+")
+    bplot2 = plt.boxplot(condition_dict["non_MI"], labels=labels, positions=(2.5, 2.9), widths=0.3, patch_artist=True, showmeans=True, meanprops={'marker':'o', "markerfacecolor":"black", "markeredgecolor": "black"}, sym="+")
+
+
+    for bplot in (bplot, bplot2):
+        for patch, color in zip(bplot['boxes'], colors):
+            patch.set_facecolor(color)
+
+    x_positions = [1, 2.5]
+
+    plt.xticks([i+0.8/2 for i in x_positions], x_positions_fmt)
+
+    plt.ylabel(ylabel)
     plt.legend(bplot["boxes"], labels, loc="best")
     plt.show()
 
@@ -49,7 +71,6 @@ def remove_append_utterances(total_df):
 
     # this may filter out some messages that might appear to be empty in the system(due to the db connection issue maybe)
     utterance_df = total_df.loc[:, ["id", "worker_utterance", "message_time", "msg_status", "mood"]].drop_duplicates().sort_values(by=["id", "message_time"])
-
     unique_worker_id = list(utterance_df["id"].unique())
     for id in unique_worker_id:
         id_df = utterance_df.loc[(utterance_df["id"] == id)]
@@ -58,7 +79,6 @@ def remove_append_utterances(total_df):
             # for each worker, we examine if an utterance was added and then deleted, if so, there must be two duplicated utterances
             dup_utt = id_df.duplicated(subset=["id", "worker_utterance"], keep=False)
             wait_to_check_status = list(id_df[dup_utt]["msg_status"].values)
-
             for i in range(0, len(wait_to_check_status), 2):
                 if (((i+1)>=len(wait_to_check_status)) & (wait_to_check_status[i] == "Added")):
                     continue
@@ -74,30 +94,43 @@ def remove_append_utterances(total_df):
 
 
 def len_utterance(total_df):
-    utterance_df = total_df.loc[:, ["id", "final_msg", "mood", "interacted"]].drop_duplicates().sort_values(by=["id"])
+
+    utterance_df = total_df.loc[:, ["id", "final_msg", "mood", "interacted", "stage"]].drop_duplicates().sort_values(by=["id"])
+    utterance_df["len_msg"] = utterance_df["final_msg"].apply(lambda x: len(re.findall(r'\w+', str(x))))
+    # find an outlier that has multiple repeated inputs
+    worker_repeated_input = utterance_df[utterance_df["len_msg"] == utterance_df["len_msg"].max()]["id"].values[0]
+    repeated_input_df = total_df[total_df["id"]==worker_repeated_input][["worker_utterance", "message_time"]].sort_values(by=["message_time"]).drop_duplicates()[:2]
+    utterance_df.loc[utterance_df["id"] == worker_repeated_input, "final_msg"] = " ".join(repeated_input_df["worker_utterance"].values)
+
+    # modified the length of that outlier message, and recalculated the message lenghth
     utterance_df["len_msg"] = utterance_df["final_msg"].apply(lambda x: len(re.findall(r'\w+', str(x))))
     print("The average length of the worker utterances: ", utterance_df["len_msg"].sum(axis=0)/len(utterance_df))
-    # # length of message v.s. pre-task mood
+
+
+    # length of message v.s. pre-task mood
+    # utterance_df = map_mood_cat(utterance_df)
     # sns.boxplot(x=utterance_df["mood"], y=utterance_df["len_msg"])
     # plt.show()
+    return utterance_df
 
+
+def map_mood_cat(utterance_df):
+    mood_to_cat = {1: "pleasant", 2: "pleasant", 3: "pleasant", 4: "pleasant", 5: "unpleasant", 6:"unpleasant", 7: "unpleasant", 8:"unpleasant", 9: "neutral"}
+    utterance_df["mood"] = utterance_df["mood"].map(mood_to_cat)
     return utterance_df
 
 
 def mood_interacted_df(utterance_df):
-    # relation between the mood and the interacted type
-    interacted_mood = utterance_df.groupby(["mood", "interacted"])["id"].nunique().reset_index()
-    bar_x = list(interacted_mood["mood"].unique())
-
-    interacted_mood.loc[17] = [8, "Yes, I did.", 0]
-
-    interacted_mood["mood"] = interacted_mood["mood"].astype(int)
-    interacted_mood = interacted_mood.sort_values(by="mood")
-
-    bar_y1 = list(interacted_mood[(interacted_mood["interacted"]=="Yes, I did.")]["id"].values)
-    bar_y2 = list(interacted_mood[(interacted_mood["interacted"]=="No, I did not.")]["id"].values)
-
-    return bar_x, (bar_y1, bar_y2)
+    # map the mood, 1-4 mapped to pleasant, 5-8 mapped to unpleasant, 9 mapped to neutral
+    utterance_df = map_mood_cat(utterance_df)
+    # relation between the mood and the interacted type, cluster the interacted type based on the mood score
+    interacted_mood = utterance_df.groupby(["mood", "interacted"])["id"].nunique().unstack("interacted")
+    print(interacted_mood)
+    interacted_mood.plot(kind="bar", stacked=True)
+    plt.xticks(rotation=0)
+    plt.xlabel("mood type")
+    plt.ylabel("number of participants")
+    plt.show()
 
 
 def task_cxt_df(total_df, condition_dict):
@@ -156,22 +189,9 @@ def behavior_satis_df(total_df):
     # check the relation between behavior and satisfaction score
 
     # extract all the workers who had behavior, order by the behavior time
-    b_df = total_df[total_df["interacted"]=="Yes, I did."].loc[:, ["id", "stage", "b_name", "behavior_time", "message_time", "final_msg", "interacted", "mood", "satis_score"]].drop_duplicates().sort_values(by=["id", "behavior_time"])
+    b_df = total_df[(total_df["interacted"]=="Yes, I did.")].loc[:, ["id", "stage", "b_name", "behavior_time", "message_time", "final_msg", "interacted", "mood", "satis_score"]].drop_duplicates().sort_values(by=["id", "behavior_time"])
 
-    # validity check: check if the first message time is behind the first behavior
-    unique_worker_id = list(b_df["id"].unique())
-    not_valid_id = []
-    for id in unique_worker_id:
-        id_df = b_df.loc[(b_df["id"] == id)]
-        min_msg_time = id_df["message_time"].min()
-        min_b_time = id_df["behavior_time"].min()
-        if min_msg_time < min_b_time:
-            not_valid_id.append(id)
-    print("Workers who responded first and then interacted (partially) with ContextBot: ", not_valid_id)
-
-    # message time column might repeat due to the message status
-    b_df.drop(["message_time"], axis=1, inplace=True)
-    response_after_help_df = b_df[~b_df["id"].isin(not_valid_id)].drop_duplicates()
+    response_after_help_df = b_df.drop_duplicates()
 
     # give one-hot encoding of all the behavior types
     behavior_dummies = pd.get_dummies(response_after_help_df[["b_name"]])
@@ -185,9 +205,7 @@ def behavior_satis_df(total_df):
     b_name_df.reset_index(inplace=True)
     b_name_df.rename(columns={"index": "id"}, inplace=True)
 
-
     # count the number of finishing each dimension of context
-
     # check if each dimension of cxt was interacted with
     cxt_type_dict = {"interacted_social_cxt":["b_name_Hmm...I think so.", "b_name_Sure, let us begin!"], "interacted_ready_ling_cxt":["b_name_Yes, very clear!", "b_name_Well...I still don't understand."],
                      "interacted_ling_cxt":["b_name_Clicked the back button", "b_name_Clicked the linked text", "b_name_Clicked the next button"],
@@ -244,35 +262,73 @@ def behavior_satis_df(total_df):
 
         plt.show()
 
-
     b_name_df = pd.merge(response_after_help_df.loc[:, ["id", "satis_score", "stage"]], b_name_df, on=["id"], how="inner").drop_duplicates()
     b_name_df["interacted_all_cxt"].fillna(0, inplace=True)
-    boxplot_cxt_satis(b_name_df)
+
+    # plot the interaction stage with the satisfaction score
+    # boxplot_cxt_satis(b_name_df)
+
+    return b_name_df.loc[:, ["id", "interacted_social_cxt", "interacted_ready_ling_cxt", "interacted_ling_cxt", "interacted_seman_cxt", "interacted_ready_cog_cxt", "interacted_cog_cxt", "interacted_prompt_cxt", "interacted_all_cxt", "only_bot_icon"]]
 
 
+def behavior_agreement_df(total_df, b_name_df):
+    b_agree_df = pd.merge(total_df, b_name_df, on="id", how="outer")
+    print(b_agree_df.head())
+
+
+def after_merge_msg_df(total_df):
+    # the following process is based on the principle that one worker has one final utterance
+    total_df = remove_append_utterances(total_df)
+    total_df.to_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/total_df.csv")
+
+
+def task_cognitive_load(total_df):
+    total_df["mean_task_load"] = round((total_df[["Q3_1", "Q3_2", "Q3_3", "Q3_4", "Q3_5", "Q3_6"]].sum(axis=1))/6, 3)
+    return total_df
+
+def plain_three_groups_boxplot(condition_dict, ylabel, labels):
+    boxes = list(condition_dict.values())
+    plt.boxplot(boxes, showmeans=True, labels=labels, meanprops = {'marker':'*'})
+    plt.ylabel(ylabel)
+    plt.show()
 
 
 
 if __name__ == "__main__":
-    total_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/final_df.csv", index_col=0)
+    # total_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/total_df.csv", index_col=0)
+    # total_df = task_cognitive_load(total_df)
 
-    # the following process is based on the principle that one worker has one final utterance
-    total_df = remove_append_utterances(total_df)
-
-
-    # behavior v.s. satisfaction score
-    behavior_satis_df(total_df)
-
-
-
+    ueq_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/ueq.csv", index_col=0)
+    ueq_df["mean_pragmatic"] = round((ueq_df[["Q2_1", "Q2_2", "Q2_3", "Q2_4"]].sum(axis=1))/4, 3)
+    ueq_df["mean_hedonic"] = round((ueq_df[["Q2_5", "Q2_6", "Q2_7", "Q2_8"]].sum(axis=1))/4, 3)
+    ueq_df["mean_ueq"] = round((ueq_df[["Q2_1", "Q2_2", "Q2_3", "Q2_4", "Q2_5", "Q2_6", "Q2_7", "Q2_8"]].sum(axis=1))/8, 3)
 
 
     # task type v.s. execution time
     # boxplot_stage_time(extract_conditional_df(total_df, {"MI": [], "non_MI": [], "history": []}, ["early", "half", "late"]), ["early", "half", "late"], ['lightblue', 'lightgreen', 'lightyellow'])
 
     # # within each task type, interacted v.s. execution time
-    # boxplot_stage_time(extract_conditional_df(total_df, {"early": [], "half": [], "late": []}, ["Yes, I did.", "No, I did not."]), ["interacted", "not interacted"], ['lightblue', 'lightgreen'])
+    # boxplot_stage_time(extract_conditional_df(total_df, {"early": [], "half": [], "late": []}, ["True", "False"]), ["interacted", "not interacted"], ['lightblue', 'lightgreen'])
+
+    # mood v.s. length of msg
+    # len_utterance(total_df)
+
+    # mood v.s. interacted type
+    # mood_interacted_df(len_utterance(total_df))
 
     # context type v.s. mean score of agreement
     # bar_x, bar_y = task_cxt_df(remove_append_utterances(total_df), {"MI_early":[], "MI_half":[], "MI_late":[]})
     # barplot(["MI_early", "MI_half", "MI_late"], "context type", "mean score", bar_x, *bar_y)
+
+
+    # behavior v.s. satisfaction score
+
+    # b_name_df = behavior_satis_df(total_df)
+    # b_name_df.to_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/b_name_df.csv")
+    # b_name_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/b_name_df.csv", index_col=0)
+    # behavior_agreement_df(total_df, b_name_df)
+
+    # cognitive load
+    # boxplot_stage_time(extract_conditional_df(total_df, {"MI": [], "non_MI": [], "history": []}, ["early", "half", "late"]), ["early", "half", "late"], ['lightblue', 'lightgreen', 'lightyellow'])
+    boxplot_three_groups_two_each(within_group_test(ueq_df, "mean_hedonic"), ["Interacted", "Not interacted"], ['dimgrey', 'silver'], "Mean hedonic score")
+    # boxplot_two_groups_two_each(within_group_test(ueq_df, "mean_hedonic"), ["Interacted", "Not interacted"], ['dimgrey', 'silver'], "Mean hedonic score")
