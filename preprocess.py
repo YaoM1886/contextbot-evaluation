@@ -257,6 +257,13 @@ def eval_ueq(total_df):
     return ueq_df
 
 
+def task_cognitive_load(total_df):
+    task_load_df = total_df.loc[:, ["id", "prolific_id", "stage", "spent_time", "interacted", "preprogrammed", "Q3_1", "Q3_2", "Q3_3", "Q3_4", "Q3_5", "Q3_6", "satis_score"]].drop_duplicates()
+    task_load_df["mean_task_load"] = round((task_load_df[["Q3_1", "Q3_2", "Q3_3", "Q3_4", "Q3_5", "Q3_6"]].sum(axis=1))/6, 3)
+    task_load_df.to_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/task_load.csv")
+    return total_df
+
+
 def random_msg_sample():
     # randomly select msg samples for the workers and psychologists
     total_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/total_df.csv", index_col=0)
@@ -283,20 +290,12 @@ def random_msg_sample():
 
 
 
-
-
-
-
 if __name__ == "__main__":
     # preprocess the table and surveys, get the final data
-    # total_df = preprocess_tables_surveys()
-    # total_df.to_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/final_df.csv")
-    total_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/final_df.csv")
-    eval_ueq(total_df)
+    total_df = preprocess_tables_surveys()
+    # total_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/final_df.csv")
 
-    # calculate the user experience score, keep the id, prolific_id, stage, spent_time, interacted, Q2_1 to Q2_8, preprogrammed
-    # ueq_df = eval_ueq(total_df)
-
+    # task_cognitive_load(total_df)
 
 
 

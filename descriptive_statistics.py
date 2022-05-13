@@ -2,8 +2,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import re
 import numpy as np
-import seaborn as sns
-from statistic_test_ueq import within_group_test
+from statistic_test import within_group_test, between_groups_test
 
 
 pd.set_option("display.max_rows", None)
@@ -24,10 +23,31 @@ def extract_conditional_df(total_df, condition_dict, condition_boxes):
 
     return condition_dict
 
+def boxplot_three_groups_three_each(condition_dict, labels, colors, ylabel):
+    # boxplot of the nine stages and their spent time of the task
+    x_positions_fmt = ["MI*", "Non-MI", "History*"]
+
+    bplot = plt.boxplot(condition_dict["MI"], labels=labels, positions=(1, 1.4, 1.8), widths=0.3, patch_artist=True, showmeans=True, meanprops={'marker':'o', "markerfacecolor":"black", "markeredgecolor": "black"}, sym="+")
+    bplot2 = plt.boxplot(condition_dict["non_MI"], labels=labels, positions=(2.5, 2.9, 3.3), widths=0.3, patch_artist=True, showmeans=True, meanprops={'marker':'o', "markerfacecolor":"black", "markeredgecolor": "black"}, sym="+")
+    bplot3 = plt.boxplot(condition_dict["history"], labels=labels, positions=(4, 4.4, 4.8), widths=0.3, patch_artist=True, showmeans=True, meanprops={'marker':'o', "markerfacecolor":"black", "markeredgecolor": "black"}, sym="+")
+
+
+    for bplot in (bplot, bplot2, bplot3):
+        for patch, color in zip(bplot['boxes'], colors):
+            patch.set_facecolor(color)
+
+    x_positions = [1, 2.5, 4]
+
+    plt.xticks([i+0.8/2 for i in x_positions], x_positions_fmt)
+
+    plt.ylabel(ylabel)
+    plt.legend(bplot["boxes"], labels, loc="best", prop={"size":8})
+    plt.show()
+
 
 def boxplot_three_groups_two_each(condition_dict, labels, colors, ylabel):
     # boxplot of the nine stages and their spent time of the task
-    x_positions_fmt = ["Early", "Half", "Late*"]
+    x_positions_fmt = ["Early", "Half*", "Late"]
 
     bplot = plt.boxplot(condition_dict["early"], labels=labels, positions=(1, 1.4), widths=0.3, patch_artist=True, showmeans=True, meanprops={'marker':'o', "markerfacecolor":"black", "markeredgecolor": "black"}, sym="+")
     bplot2 = plt.boxplot(condition_dict["half"], labels=labels, positions=(2.5, 2.9), widths=0.3, patch_artist=True, showmeans=True, meanprops={'marker':'o', "markerfacecolor":"black", "markeredgecolor": "black"}, sym="+")
@@ -48,7 +68,7 @@ def boxplot_three_groups_two_each(condition_dict, labels, colors, ylabel):
 
 def boxplot_two_groups_two_each(condition_dict, labels, colors, ylabel):
     # boxplot of the nine stages and their spent time of the task
-    x_positions_fmt = ["MI*", "Non-MI*"]
+    x_positions_fmt = ["MI", "Non-MI"]
 
     bplot = plt.boxplot(condition_dict["MI"], labels=labels, positions=(1, 1.4), widths=0.3, patch_artist=True, showmeans=True, meanprops={'marker':'o', "markerfacecolor":"black", "markeredgecolor": "black"}, sym="+")
     bplot2 = plt.boxplot(condition_dict["non_MI"], labels=labels, positions=(2.5, 2.9), widths=0.3, patch_artist=True, showmeans=True, meanprops={'marker':'o', "markerfacecolor":"black", "markeredgecolor": "black"}, sym="+")
@@ -282,10 +302,6 @@ def after_merge_msg_df(total_df):
     total_df.to_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/total_df.csv")
 
 
-def task_cognitive_load(total_df):
-    total_df["mean_task_load"] = round((total_df[["Q3_1", "Q3_2", "Q3_3", "Q3_4", "Q3_5", "Q3_6"]].sum(axis=1))/6, 3)
-    return total_df
-
 def plain_three_groups_boxplot(condition_dict, ylabel, labels):
     boxes = list(condition_dict.values())
     plt.boxplot(boxes, showmeans=True, labels=labels, meanprops = {'marker':'*'})
@@ -293,16 +309,10 @@ def plain_three_groups_boxplot(condition_dict, ylabel, labels):
     plt.show()
 
 
-
 if __name__ == "__main__":
-    # total_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/total_df.csv", index_col=0)
-    # total_df = task_cognitive_load(total_df)
 
+    task_load_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/task_load.csv", index_col=0)
     ueq_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/ueq.csv", index_col=0)
-    ueq_df["mean_pragmatic"] = round((ueq_df[["Q2_1", "Q2_2", "Q2_3", "Q2_4"]].sum(axis=1))/4, 3)
-    ueq_df["mean_hedonic"] = round((ueq_df[["Q2_5", "Q2_6", "Q2_7", "Q2_8"]].sum(axis=1))/4, 3)
-    ueq_df["mean_ueq"] = round((ueq_df[["Q2_1", "Q2_2", "Q2_3", "Q2_4", "Q2_5", "Q2_6", "Q2_7", "Q2_8"]].sum(axis=1))/8, 3)
-
 
     # task type v.s. execution time
     # boxplot_stage_time(extract_conditional_df(total_df, {"MI": [], "non_MI": [], "history": []}, ["early", "half", "late"]), ["early", "half", "late"], ['lightblue', 'lightgreen', 'lightyellow'])
@@ -328,7 +338,14 @@ if __name__ == "__main__":
     # b_name_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/b_name_df.csv", index_col=0)
     # behavior_agreement_df(total_df, b_name_df)
 
-    # cognitive load
     # boxplot_stage_time(extract_conditional_df(total_df, {"MI": [], "non_MI": [], "history": []}, ["early", "half", "late"]), ["early", "half", "late"], ['lightblue', 'lightgreen', 'lightyellow'])
-    boxplot_three_groups_two_each(within_group_test(ueq_df, "mean_hedonic"), ["Interacted", "Not interacted"], ['dimgrey', 'silver'], "Mean hedonic score")
+    # boxplot_three_groups_two_each(within_group_test(ueq_df, "mean_hedonic"), ["Interacted", "Not interacted"], ['dimgrey', 'silver'], "Mean hedonic score")
     # boxplot_two_groups_two_each(within_group_test(ueq_df, "mean_hedonic"), ["Interacted", "Not interacted"], ['dimgrey', 'silver'], "Mean hedonic score")
+    #
+    # boxplot_three_groups_two_each(within_group_test(ueq_df, "mean_pragmatic"), ["Not interacted", "History"], ['dimgrey', 'silver'], "Mean pragmatic score")
+    # MI_dict = between_groups_test(ueq_df, "mean_pragmatic")
+    # boxplot_three_groups_three_each(MI_dict, ["MI", "Non-MI", "History"], ['dimgrey', 'silver', 'whitesmoke'], "Mean pragmatic score")
+
+    # boxplot_two_groups_two_each(within_group_test(task_load_df, "mean_task_load"), ["Interacted", "Not interacted"], ['dimgrey', 'silver'], "Mean task load")
+    # boxplot_three_groups_two_each(within_group_test(task_load_df, "mean_task_load"), ["Non-MI-not-interacted", "History"], ['dimgrey', 'silver'], "Mean task load")
+    boxplot_three_groups_three_each(between_groups_test(task_load_df, "spent_time"), ["Early", "Half", "Late"], ['dimgrey', 'silver', 'whitesmoke'], "Execution time (seconds)")
