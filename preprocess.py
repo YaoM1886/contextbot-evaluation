@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 
 # TODO:
 #      3. calculate the cognitive load score based on the manual
@@ -271,31 +272,85 @@ def random_msg_sample():
     final_msg = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/final_msg.csv", index_col=0)
     msg_stage = pd.merge(final_msg, total_df, how="right", on=["id", "final_msg"]).loc[:, ["id", "final_msg", "stage", "interacted_x"]].drop_duplicates().set_index("id")
 
-
+    msg_stage.to_csv("/Users/sylvia/Desktop/final_msg.csv")
     entry_condition = ["MI_early", "MI_half", "MI_late", "non_MI_early", "non_MI_half", "non_MI_late"]
     interacted_condition = ["Yes, I did.", "No, I did not."]
     sampled_id_msg = {}
     for entry in entry_condition:
         for inter in interacted_condition:
-            id_msg = msg_stage[(msg_stage["stage"]=="main_"+entry) & (msg_stage["interacted_x"] == inter)]["final_msg"].sample(n=5, random_state=33)
+            id_msg = msg_stage[(msg_stage["stage"]=="main_"+entry) & (msg_stage["interacted_x"] == inter)]["final_msg"].sample(n=5, random_state=58)
             sampled_id_msg[entry+"_"+inter+"_"+"id"] = list(id_msg.index)
             sampled_id_msg[entry+"_"+inter+"_"+"msg"] = list(id_msg.values)
     for entry in ["history_early", "history_half", "history_late"]:
-        id_msg = msg_stage[msg_stage["stage"]=="main_"+entry]["final_msg"].sample(n=5, random_state=33)
+        id_msg = msg_stage[msg_stage["stage"]=="main_"+entry]["final_msg"].sample(n=5, random_state=5)
         sampled_id_msg[entry+"_"+"id"] = list(id_msg.index)
         sampled_id_msg[entry+"_"+"msg"] = list(id_msg.values)
 
     msg_sample_df = pd.DataFrame(sampled_id_msg)
-    # msg_sample_df.to_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/sampled_msg_df.csv")
+    print(msg_sample_df)
+    msg_sample_df.to_csv("/Users/sylvia/Desktop/sampled_msg_df2.csv")
+
+
+def total_human_eval_df():
+    sampled_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/sampled_msg_df_v3_75.csv", index_col=0).sort_index()
+    print(sampled_df)
+
+    sampled_df["consis_MI_early_inter"] = [5.0, 4.7, 5.7, 4.7, 5.7, 2.0, 5.7, 4.7, 6.3, 4.7, 4.3, 5.0, 4.7, 5.0, 5.7, 6.3]
+    sampled_df["consis_MI_early_not_inter"] = [5.3, 2.3, 3.3, 3.7, 3.3, 3.7, 4.7, 3.7, 3.0, 4.0, 4.0, 4.0, 5.7, 6.0, 6.0]
+    sampled_df["consis_non_MI_early_inter"] = [3.7, 5.3, 5.3, 6.0, 4.0, 6.0, 6.7, 4.0, 6.0, 5.0, 5.7, 5.0, 1.7, 5.7]
+    sampled_df["consis_non_MI_early_not_inter"] = [5.0, 4.0, 3.7, 5.7, 4.7, 4.3, 3.0, 2.3, 3.7, 4.0, 3.0, 4.7, 2.3, 3.3, 3.3]
+    sampled_df["consis_history_early"] = [4.3, 5.3, 5.0, 5.7, 5.0, 2.7, 5.7, 3.3, 4.0, 4.0, 4.0, 3.0, 4.3, 4.3, 5.3]
+
+    sampled_df["consis_MI_half_inter"] = [3.7, 3.7, 5.3, 3.0, 3.3, 3.3, 4.7, 4.3, 3.7, 3.7, 5.3, 5.7, 6.0, 3.0]
+    sampled_df["consis_MI_half_not_inter"] = [3.7, 3.7, 3.7, 3.0, 3.0, 4.3, 2.3, 2.7, 3.0, 4.7, 3.7, 5.7, 6.7, 6.0, 5.3]
+    sampled_df["consis_non_MI_half_inter"] = [2.7, 2.0, 4.0, 4.0, 3.0, 4.7, 5.7, 4.3, 3.0, 3.0]
+    sampled_df["consis_non_MI_half_not_inter"] = [4.0, 3.3, 3.7, 3.7, 3.0, 2.3, 4.7, 2.0, 3.3, 2.3, 5.7, 5.3, 3.3, 5.0, 5.3]
+    sampled_df["consis_history_half"] = [4.7, 4.0, 4.7, 4.3, 3.0, 4.0, 2.0, 2.7, 2.3, 1.7, 4.0, 5.7, 4.7, 4.3, 3.7]
+
+    sampled_df["consis_MI_late_inter"] = [4.0, 6.3, 1.3, 3.3, 3.3, 6.3, 3.3, 2.7, 5.7, 2.0, 4.3, 6.0]
+    sampled_df["consis_MI_late_not_inter"] = [3.7, 4.7, 1.7, 4.7, 5.7, 3.0, 2.0, 4.7, 5.0, 5.3, 5.3, 5.0, 5.3, 4.7, 4.0]
+    sampled_df["consis_non_MI_late_inter"] = [5.3, 3.7, 4.0, 2.0, 4.7, 5.3, 3.7, 2.3, 4.0, 5.7, 5.3, 4.7, 2.3]
+    sampled_df["consis_non_MI_late_not_inter"] = [2.0, 1.7, 3.7, 3.3, 3.3, 4.3, 3.7, 3.3, 4.3, 3.3, 3.0, 3.7, 1.3, 4.3, 4.3]
+    sampled_df["consis_history_late"] = [2.0, 3.7, 2.0, 1.0, 4.7, 4.3, 4.3, 3.7, 3.7, 4.7, 4.0, 2.0, 4.3, 3.7, 3.3]
+
+
+    sampled_df["prof_MI_early_inter"] = [6.0, 7.0, 3.5, 6.5, 5.0, None, None,None,None,None]
+    sampled_df["prof_MI_early_not_inter"] = [5.0, 1.0, 1.5, 3.0, 4.5, None, None,None,None,None]
+    sampled_df["prof_notMI_early_inter"] = [2.0, 4.5, 5.5, 5.0, 5.0, None, None,None,None,None]
+    sampled_df["prof_notMI_early_not_inter"] = [5.5, 3.0, 5.5, 7.0, 6.5, None, None,None,None,None]
+    sampled_df["prof_history_early"] = [3.5, 4.5, 3.5, 6.0, 6.0, None, None,None,None,None]
+
+    sampled_df["prof_MI_half_inter"] = [5.0, 6.0, 5.5, 6.5, 5.0, None, None,None,None,None]
+    sampled_df["prof_MI_half_not_inter"] = [4.0, 6.0, 3.5, 3.5, 4.0, None, None,None,None,None]
+    sampled_df["prof_notMI_half_inter"] = [6.0, 3.5, 5.0, 6.0, 6.0, None, None,None,None,None]
+    sampled_df["prof_notMI_half_not_inter"] = [4.5, 5.5, 4.5, 4.0, 5.0, None, None,None,None,None]
+    sampled_df["prof_history_half"] = [4.5, 5.0, 4.0, 6.0, 4.0, None, None,None,None,None]
+
+    sampled_df["prof_MI_late_inter"] = [6.0, 5.5, 2.5, 5.5, 6.0, None, None,None,None,None]
+    sampled_df["prof_MI_late_not_inter"] = [6.0, 3.5, 4.0, 5.0, 4.5, None, None,None,None,None]
+    sampled_df["prof_notMI_late_inter"] = [6.0, 3.5, 3.5, 5.0, 4.5, None, None,None,None,None]
+    sampled_df["prof_notMI_late_not_inter"] = [4.0, 4.0, 5.0, 6.0, 5.0, None, None,None,None,None]
+    sampled_df["prof_history_late"] = [4.5, 4.0, 4.0, 3.5, 5.5, None, None,None,None,None]
+
+    sampled_df.to_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/sampled_eval_df_v2_50.csv")
 
 
 
 if __name__ == "__main__":
     # preprocess the table and surveys, get the final data
-    total_df = preprocess_tables_surveys()
-    # total_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/final_df.csv")
+    # total_df = preprocess_tables_surveys()
+    total_human_eval_df()
+    # worker_eval_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/consistency/consistency_half_final.csv", index_col=0).reset_index()
+    #
+    # worker_eval_df.drop(["Q26", "half_comments_g1", "half_comments_g2","half_comments_g3","prolific_id_g3","prolific_id"], inplace=True, axis=1)
+    # worker_eval_df.loc["mean"] = round(worker_eval_df.astype(int).mean(axis=0),1)
+    # print(worker_eval_df)
+    # df = pd.DataFrame(psych_eval_df.iloc[:, 50:].T.values.astype(int))
+    # print(df)
+    # df.T.boxplot(vert=False)
+    # plt.subplots_adjust(left=0.25)
+    # plt.show()
 
-    # task_cognitive_load(total_df)
 
 
 

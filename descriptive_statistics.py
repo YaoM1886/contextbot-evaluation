@@ -25,11 +25,11 @@ def extract_conditional_df(total_df, condition_dict, condition_boxes):
 
 def boxplot_three_groups_three_each(condition_dict, labels, colors, ylabel):
     # boxplot of the nine stages and their spent time of the task
-    x_positions_fmt = ["MI*", "Non-MI", "History*"]
+    x_positions_fmt = ["Early*", "Half", "Late"]
 
-    bplot = plt.boxplot(condition_dict["MI"], labels=labels, positions=(1, 1.4, 1.8), widths=0.3, patch_artist=True, showmeans=True, meanprops={'marker':'o', "markerfacecolor":"black", "markeredgecolor": "black"}, sym="+")
-    bplot2 = plt.boxplot(condition_dict["non_MI"], labels=labels, positions=(2.5, 2.9, 3.3), widths=0.3, patch_artist=True, showmeans=True, meanprops={'marker':'o', "markerfacecolor":"black", "markeredgecolor": "black"}, sym="+")
-    bplot3 = plt.boxplot(condition_dict["history"], labels=labels, positions=(4, 4.4, 4.8), widths=0.3, patch_artist=True, showmeans=True, meanprops={'marker':'o', "markerfacecolor":"black", "markeredgecolor": "black"}, sym="+")
+    bplot = plt.boxplot(condition_dict["early"], labels=labels, positions=(1, 1.4, 1.8), widths=0.3, patch_artist=True, showmeans=True, meanprops={'marker':'o', "markerfacecolor":"black", "markeredgecolor": "black"}, sym="+")
+    bplot2 = plt.boxplot(condition_dict["half"], labels=labels, positions=(2.5, 2.9, 3.3), widths=0.3, patch_artist=True, showmeans=True, meanprops={'marker':'o', "markerfacecolor":"black", "markeredgecolor": "black"}, sym="+")
+    bplot3 = plt.boxplot(condition_dict["late"], labels=labels, positions=(4, 4.4, 4.8), widths=0.3, patch_artist=True, showmeans=True, meanprops={'marker':'o', "markerfacecolor":"black", "markeredgecolor": "black"}, sym="+")
 
 
     for bplot in (bplot, bplot2, bplot3):
@@ -47,7 +47,7 @@ def boxplot_three_groups_three_each(condition_dict, labels, colors, ylabel):
 
 def boxplot_three_groups_two_each(condition_dict, labels, colors, ylabel):
     # boxplot of the nine stages and their spent time of the task
-    x_positions_fmt = ["Early", "Half*", "Late"]
+    x_positions_fmt = ["Early*", "Half", "Late"]
 
     bplot = plt.boxplot(condition_dict["early"], labels=labels, positions=(1, 1.4), widths=0.3, patch_artist=True, showmeans=True, meanprops={'marker':'o', "markerfacecolor":"black", "markeredgecolor": "black"}, sym="+")
     bplot2 = plt.boxplot(condition_dict["half"], labels=labels, positions=(2.5, 2.9), widths=0.3, patch_artist=True, showmeans=True, meanprops={'marker':'o', "markerfacecolor":"black", "markeredgecolor": "black"}, sym="+")
@@ -85,6 +85,7 @@ def boxplot_two_groups_two_each(condition_dict, labels, colors, ylabel):
     plt.ylabel(ylabel)
     plt.legend(bplot["boxes"], labels, loc="best")
     plt.show()
+
 
 
 def remove_append_utterances(total_df):
@@ -245,15 +246,21 @@ def behavior_satis_df(total_df):
     # check the workers who finished the whole interaction
     b_name_df.loc[(b_name_df["interacted_social_cxt"]>0)&(b_name_df["interacted_ready_ling_cxt"]>0) & (b_name_df["interacted_ling_cxt"]) &(b_name_df["interacted_seman_cxt"]>0) & (b_name_df[ "interacted_ready_cog_cxt"]>0)& (b_name_df["interacted_cog_cxt"]>0) & (b_name_df["interacted_prompt_cxt"]>0), "interacted_all_cxt"] = 1
 
-    # check the workers who only clicked the icon
-    b_name_df.loc[(b_name_df["b_name_Clicked the ContextBot Icon"]>0), "only_bot_icon"] = 1
+    # check the workers who clicked the icon
+    b_name_df.loc[(b_name_df["b_name_Clicked the ContextBot Icon"]>0), "click_bot_icon"] = 1
 
-    interacted_cxt_types = ["only_bot_icon"]
+    # reorder the name of the cxt type names
+    interacted_cxt_types = ["click_bot_icon"]
     interacted_cxt_types.extend(list(cxt_type_dict.keys()))
     interacted_cxt_types.append("interacted_all_cxt")
 
     for interacted_cxt_type in interacted_cxt_types:
         print("Number of workers who finished %s: "%(interacted_cxt_type), len(b_name_df[b_name_df[interacted_cxt_type]==1]))
+
+
+    # check who only clicked the bot icon, we named it as not actually interated
+    only_bot_icon_worker = list(b_name_df[b_name_df["id"].isin(b_name_df[(b_name_df["interacted_prompt_cxt"]==1) & (b_name_df["interacted_cog_cxt"]==1)]["id"])]["id"])
+    print(only_bot_icon_worker)
 
     # # check which worker explored which cognitive cxt
     # id_user_intention = b_name_df[b_name_df["b_name_User's intention"]>0]["id"].values
@@ -261,7 +268,7 @@ def behavior_satis_df(total_df):
     # id_your_intention = b_name_df[b_name_df["b_name_Your intention"]>0]["id"].values
 
     def boxplot_cxt_satis(b_name_df):
-        cxt_type_dict = ["only_bot_icon", "interacted_social_cxt", "interacted_ready_ling_cxt"]
+        cxt_type_dict = ["click_bot_icon", "interacted_social_cxt", "interacted_ready_ling_cxt"]
         box_dict = dict.fromkeys(cxt_type_dict)
         for i in range(0, len(cxt_type_dict)-1):
             box_dict[cxt_type_dict[i]] = list(b_name_df[b_name_df["id"].isin(b_name_df[(b_name_df[cxt_type_dict[i]]==1) & (b_name_df[cxt_type_dict[i+1]]==0)]["id"])]["satis_score"].values)
@@ -288,7 +295,7 @@ def behavior_satis_df(total_df):
     # plot the interaction stage with the satisfaction score
     # boxplot_cxt_satis(b_name_df)
 
-    return b_name_df.loc[:, ["id", "interacted_social_cxt", "interacted_ready_ling_cxt", "interacted_ling_cxt", "interacted_seman_cxt", "interacted_ready_cog_cxt", "interacted_cog_cxt", "interacted_prompt_cxt", "interacted_all_cxt", "only_bot_icon"]]
+    return b_name_df.loc[:, ["id", "interacted_social_cxt", "interacted_ready_ling_cxt", "interacted_ling_cxt", "interacted_seman_cxt", "interacted_ready_cog_cxt", "interacted_cog_cxt", "interacted_prompt_cxt", "interacted_all_cxt", "click_bot_icon"]]
 
 
 def behavior_agreement_df(total_df, b_name_df):
@@ -310,9 +317,17 @@ def plain_three_groups_boxplot(condition_dict, ylabel, labels):
 
 
 if __name__ == "__main__":
+    total_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/final_df.csv")
 
-    task_load_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/task_load.csv", index_col=0)
-    ueq_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/ueq.csv", index_col=0)
+    # print(behavior_satis_df(remove_append_utterances(total_df)))
+    # task_load_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/task_load.csv", index_col=0)
+    # ueq_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/ueq.csv", index_col=0)
+    # eval_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/sampled_eval_df_v2_50.csv", index_col=0)
+    # print(eval_df)
+    condition_dict = {"early":[[5.0, 4.7, 5.7, 4.7, 5.7, 2.0, 5.7, 4.7, 6.3, 4.7, 4.3, 5.0, 4.7, 5.0, 5.7, 6.3, 3.7, 5.3, 5.3, 6.0, 4.0, 6.0, 6.7, 4.0, 6.0, 5.0, 5.7, 5.0, 1.7, 5.7],[5.3, 2.3, 3.3, 3.7, 3.3, 3.7, 4.7, 3.7, 3.0, 4.0, 4.0, 4.0, 5.7, 6.0, 6.0,5.0, 4.0, 3.7, 5.7, 4.7, 4.3, 3.0, 2.3, 3.7, 4.0, 3.0, 4.7, 2.3, 3.3, 3.3], [4.3, 5.3, 5.0, 5.7, 5.0, 2.7, 5.7, 3.3, 4.0, 4.0, 4.0, 3.0, 4.3, 4.3, 5.3]], "half":[[3.7, 3.7, 5.3, 3.0, 3.3, 3.3, 4.7, 4.3, 3.7, 3.7, 5.3, 5.7, 6.0, 3.0,2.7, 2.0, 4.0, 4.0, 3.0, 4.7, 5.7, 4.3, 3.0, 3.0],[3.7, 3.7, 3.7, 3.0, 3.0, 4.3, 2.3, 2.7, 3.0, 4.7, 3.7, 5.7, 6.7, 6.0, 5.3,4.0, 3.3, 3.7, 3.7, 3.0, 2.3, 4.7, 2.0, 3.3, 2.3, 5.7, 5.3, 3.3, 5.0, 5.3],[4.7, 4.0, 4.7, 4.3, 3.0, 4.0, 2.0, 2.7, 2.3, 1.7, 4.0, 5.7, 4.7, 4.3, 3.7]], "late":[[4.0, 6.3, 1.3, 3.3, 3.3, 6.3, 3.3, 2.7, 5.7, 2.0, 4.3, 6.0,5.3, 3.7, 4.0,  2.0, 4.7, 5.3, 3.7, 2.3, 4.0, 5.7, 5.3, 4.7, 2.3],[3.7, 4.7, 1.7, 4.7, 5.7, 3.0, 2.0, 4.7, 5.0, 5.3, 5.3, 5.0, 5.3, 4.7, 4.0,2.0, 1.7, 3.7, 3.3, 3.3, 4.3, 3.7, 3.3, 4.3, 3.3, 3.0, 3.7, 1.3, 4.3, 4.3],[2.0, 3.7, 2.0, 1.0, 4.7, 4.3, 4.3, 3.7, 3.7, 4.7, 4.0, 2.0, 4.3, 3.7, 3.3]]}
+    boxplot_three_groups_three_each(condition_dict, ["Interacted (MI)", "Not interacted (MI)", "History"], ['dimgrey', 'silver', 'whitesmoke'], "Consistency score")
+
+
 
     # task type v.s. execution time
     # boxplot_stage_time(extract_conditional_df(total_df, {"MI": [], "non_MI": [], "history": []}, ["early", "half", "late"]), ["early", "half", "late"], ['lightblue', 'lightgreen', 'lightyellow'])
@@ -348,4 +363,4 @@ if __name__ == "__main__":
 
     # boxplot_two_groups_two_each(within_group_test(task_load_df, "mean_task_load"), ["Interacted", "Not interacted"], ['dimgrey', 'silver'], "Mean task load")
     # boxplot_three_groups_two_each(within_group_test(task_load_df, "mean_task_load"), ["Non-MI-not-interacted", "History"], ['dimgrey', 'silver'], "Mean task load")
-    boxplot_three_groups_three_each(between_groups_test(task_load_df, "spent_time"), ["Early", "Half", "Late"], ['dimgrey', 'silver', 'whitesmoke'], "Execution time (seconds)")
+    # boxplot_three_groups_three_each(between_groups_test(task_load_df, "spent_time"), ["Early", "Half", "Late"], ['dimgrey', 'silver', 'whitesmoke'], "Execution time (seconds)")
