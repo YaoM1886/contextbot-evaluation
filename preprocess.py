@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import re
 import matplotlib.pyplot as plt
 
 # TODO:
@@ -292,59 +293,41 @@ def random_msg_sample():
 
 
 def total_human_eval_df():
+    '''
+    merge worker eval tables about consistency with the sampled_msg table, then for each msg, we have a mean score of three unique workers; for each msg, we can also track the worker id and the stage, interacted types.
+    '''
+
     sampled_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/sampled_msg_df_v3_75.csv", index_col=0).sort_index()
-    print(sampled_df)
 
-    sampled_df["consis_MI_early_inter"] = [5.0, 4.7, 5.7, 4.7, 5.7, 2.0, 5.7, 4.7, 6.3, 4.7, 4.3, 5.0, 4.7, 5.0, 5.7, 6.3]
-    sampled_df["consis_MI_early_not_inter"] = [5.3, 2.3, 3.3, 3.7, 3.3, 3.7, 4.7, 3.7, 3.0, 4.0, 4.0, 4.0, 5.7, 6.0, 6.0]
-    sampled_df["consis_non_MI_early_inter"] = [3.7, 5.3, 5.3, 6.0, 4.0, 6.0, 6.7, 4.0, 6.0, 5.0, 5.7, 5.0, 1.7, 5.7]
-    sampled_df["consis_non_MI_early_not_inter"] = [5.0, 4.0, 3.7, 5.7, 4.7, 4.3, 3.0, 2.3, 3.7, 4.0, 3.0, 4.7, 2.3, 3.3, 3.3]
-    sampled_df["consis_history_early"] = [4.3, 5.3, 5.0, 5.7, 5.0, 2.7, 5.7, 3.3, 4.0, 4.0, 4.0, 3.0, 4.3, 4.3, 5.3]
+    # converted sampled_df to a new dataframe where id, msg, stage have their own column
+    sampled_eval_df = pd.DataFrame({"id":[], "msg":[], "stage":[], "interacted":"Yes, I did."})
 
-    sampled_df["consis_MI_half_inter"] = [3.7, 3.7, 5.3, 3.0, 3.3, 3.3, 4.7, 4.3, 3.7, 3.7, 5.3, 5.7, 6.0, 3.0]
-    sampled_df["consis_MI_half_not_inter"] = [3.7, 3.7, 3.7, 3.0, 3.0, 4.3, 2.3, 2.7, 3.0, 4.7, 3.7, 5.7, 6.7, 6.0, 5.3]
-    sampled_df["consis_non_MI_half_inter"] = [2.7, 2.0, 4.0, 4.0, 3.0, 4.7, 5.7, 4.3, 3.0, 3.0]
-    sampled_df["consis_non_MI_half_not_inter"] = [4.0, 3.3, 3.7, 3.7, 3.0, 2.3, 4.7, 2.0, 3.3, 2.3, 5.7, 5.3, 3.3, 5.0, 5.3]
-    sampled_df["consis_history_half"] = [4.7, 4.0, 4.7, 4.3, 3.0, 4.0, 2.0, 2.7, 2.3, 1.7, 4.0, 5.7, 4.7, 4.3, 3.7]
+    for i in range(0, len(sampled_df.columns), 2):
+        # match the pattern of column names to refill new columns in sampled_eval_df
+        sample_stage, sample_inter = re.findall(r"(\w+)\_(.*)\_id", sampled_df.columns[i])[0]
+        temp_df = sampled_df.loc[:, [sampled_df.columns[i], sampled_df.columns[i+1]]]
+        temp_df["stage"] = sample_stage
+        temp_df["interacted"] = sample_inter
+        sampled_eval_df = pd.concat([sampled_eval_df, temp_df.rename(columns={sampled_df.columns[i]:"id", sampled_df.columns[i+1]:"msg"})], sort=False, axis=0)
 
-    sampled_df["consis_MI_late_inter"] = [4.0, 6.3, 1.3, 3.3, 3.3, 6.3, 3.3, 2.7, 5.7, 2.0, 4.3, 6.0]
-    sampled_df["consis_MI_late_not_inter"] = [3.7, 4.7, 1.7, 4.7, 5.7, 3.0, 2.0, 4.7, 5.0, 5.3, 5.3, 5.0, 5.3, 4.7, 4.0]
-    sampled_df["consis_non_MI_late_inter"] = [5.3, 3.7, 4.0, 2.0, 4.7, 5.3, 3.7, 2.3, 4.0, 5.7, 5.3, 4.7, 2.3]
-    sampled_df["consis_non_MI_late_not_inter"] = [2.0, 1.7, 3.7, 3.3, 3.3, 4.3, 3.7, 3.3, 4.3, 3.3, 3.0, 3.7, 1.3, 4.3, 4.3]
-    sampled_df["consis_history_late"] = [2.0, 3.7, 2.0, 1.0, 4.7, 4.3, 4.3, 3.7, 3.7, 4.7, 4.0, 2.0, 4.3, 3.7, 3.3]
+    # remove extra none rows, and convert id to int
+    sampled_eval_df.dropna(axis=0, how="any", inplace=True)
+    sampled_eval_df["id"] = sampled_eval_df["id"].astype(int)
 
+    # since the regex cannot fix the history condition name, we rename it
+    for item in ["early", "half", "late"]:
+        sampled_eval_df.loc[(sampled_eval_df["interacted"]==item), "stage"] = "history_"+item
+        sampled_eval_df.loc[(sampled_eval_df["interacted"]==item), "interacted"] = None
 
-    sampled_df["prof_MI_early_inter"] = [6.0, 7.0, 3.5, 6.5, 5.0, None, None,None,None,None]
-    sampled_df["prof_MI_early_not_inter"] = [5.0, 1.0, 1.5, 3.0, 4.5, None, None,None,None,None]
-    sampled_df["prof_notMI_early_inter"] = [2.0, 4.5, 5.5, 5.0, 5.0, None, None,None,None,None]
-    sampled_df["prof_notMI_early_not_inter"] = [5.5, 3.0, 5.5, 7.0, 6.5, None, None,None,None,None]
-    sampled_df["prof_history_early"] = [3.5, 4.5, 3.5, 6.0, 6.0, None, None,None,None,None]
+    return sampled_eval_df
 
-    sampled_df["prof_MI_half_inter"] = [5.0, 6.0, 5.5, 6.5, 5.0, None, None,None,None,None]
-    sampled_df["prof_MI_half_not_inter"] = [4.0, 6.0, 3.5, 3.5, 4.0, None, None,None,None,None]
-    sampled_df["prof_notMI_half_inter"] = [6.0, 3.5, 5.0, 6.0, 6.0, None, None,None,None,None]
-    sampled_df["prof_notMI_half_not_inter"] = [4.5, 5.5, 4.5, 4.0, 5.0, None, None,None,None,None]
-    sampled_df["prof_history_half"] = [4.5, 5.0, 4.0, 6.0, 4.0, None, None,None,None,None]
-
-    sampled_df["prof_MI_late_inter"] = [6.0, 5.5, 2.5, 5.5, 6.0, None, None,None,None,None]
-    sampled_df["prof_MI_late_not_inter"] = [6.0, 3.5, 4.0, 5.0, 4.5, None, None,None,None,None]
-    sampled_df["prof_notMI_late_inter"] = [6.0, 3.5, 3.5, 5.0, 4.5, None, None,None,None,None]
-    sampled_df["prof_notMI_late_not_inter"] = [4.0, 4.0, 5.0, 6.0, 5.0, None, None,None,None,None]
-    sampled_df["prof_history_late"] = [4.5, 4.0, 4.0, 3.5, 5.5, None, None,None,None,None]
-
-    sampled_df.to_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/sampled_eval_df_v2_50.csv")
 
 
 
 if __name__ == "__main__":
     # preprocess the table and surveys, get the final data
-    # total_df = preprocess_tables_surveys()
-    total_human_eval_df()
-    # worker_eval_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/consistency/consistency_half_final.csv", index_col=0).reset_index()
-    #
-    # worker_eval_df.drop(["Q26", "half_comments_g1", "half_comments_g2","half_comments_g3","prolific_id_g3","prolific_id"], inplace=True, axis=1)
-    # worker_eval_df.loc["mean"] = round(worker_eval_df.astype(int).mean(axis=0),1)
-    # print(worker_eval_df)
+    total_df = preprocess_tables_surveys()
+
     # df = pd.DataFrame(psych_eval_df.iloc[:, 50:].T.values.astype(int))
     # print(df)
     # df.T.boxplot(vert=False)

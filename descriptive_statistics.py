@@ -3,7 +3,8 @@ import matplotlib.pyplot as plt
 import re
 import numpy as np
 from statistic_test import within_group_test, between_groups_test
-
+import matplotlib
+matplotlib.rcParams.update({'font.size': 15})
 
 pd.set_option("display.max_rows", None)
 pd.set_option("display.max_columns", None)
@@ -41,7 +42,7 @@ def boxplot_three_groups_three_each(condition_dict, labels, colors, ylabel):
     plt.xticks([i+0.8/2 for i in x_positions], x_positions_fmt)
 
     plt.ylabel(ylabel)
-    plt.legend(bplot["boxes"], labels, loc="best", prop={"size":8})
+    plt.legend(bplot["boxes"], labels, loc="best", prop={"size":11})
     plt.show()
 
 
@@ -72,6 +73,27 @@ def boxplot_two_groups_two_each(condition_dict, labels, colors, ylabel):
 
     bplot = plt.boxplot(condition_dict["MI"], labels=labels, positions=(1, 1.4), widths=0.3, patch_artist=True, showmeans=True, meanprops={'marker':'o', "markerfacecolor":"black", "markeredgecolor": "black"}, sym="+")
     bplot2 = plt.boxplot(condition_dict["non_MI"], labels=labels, positions=(2.5, 2.9), widths=0.3, patch_artist=True, showmeans=True, meanprops={'marker':'o', "markerfacecolor":"black", "markeredgecolor": "black"}, sym="+")
+
+
+    for bplot in (bplot, bplot2):
+        for patch, color in zip(bplot['boxes'], colors):
+            patch.set_facecolor(color)
+
+    x_positions = [1, 2.5]
+
+    plt.xticks([i+0.8/2 for i in x_positions], x_positions_fmt)
+
+    plt.ylabel(ylabel)
+    plt.legend(bplot["boxes"], labels, loc="best")
+    plt.show()
+
+
+def boxplot_two_groups_three_each(condition_dict, labels, colors, ylabel):
+    # boxplot of the nine stages and their spent time of the task
+    x_positions_fmt = ["MI", "Non-MI"]
+
+    bplot = plt.boxplot(condition_dict["MI"], labels=labels, positions=(1, 1.4, 1.8), widths=0.3, patch_artist=True, showmeans=True, meanprops={'marker':'o', "markerfacecolor":"black", "markeredgecolor": "black"}, sym="+")
+    bplot2 = plt.boxplot(condition_dict["non_MI"], labels=labels, positions=(2.5, 2.9, 3.3), widths=0.3, patch_artist=True, showmeans=True, meanprops={'marker':'o', "markerfacecolor":"black", "markeredgecolor": "black"}, sym="+")
 
 
     for bplot in (bplot, bplot2):
@@ -259,7 +281,7 @@ def behavior_satis_df(total_df):
 
 
     # check who only clicked the bot icon, we named it as not actually interated
-    only_bot_icon_worker = list(b_name_df[b_name_df["id"].isin(b_name_df[(b_name_df["interacted_prompt_cxt"]==1) & (b_name_df["interacted_cog_cxt"]==1)]["id"])]["id"])
+    only_bot_icon_worker = list(b_name_df[b_name_df["id"].isin(b_name_df[(b_name_df["interacted_all_cxt"]==1)]["id"])]["id"])
     print(only_bot_icon_worker)
 
     # # check which worker explored which cognitive cxt
@@ -318,14 +340,25 @@ def plain_three_groups_boxplot(condition_dict, ylabel, labels):
 
 if __name__ == "__main__":
     total_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/final_df.csv")
-
+    # behavior_satis_df(remove_append_utterances(total_df))
     # print(behavior_satis_df(remove_append_utterances(total_df)))
     # task_load_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/task_load.csv", index_col=0)
     # ueq_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/ueq.csv", index_col=0)
-    # eval_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/sampled_eval_df_v2_50.csv", index_col=0)
-    # print(eval_df)
-    condition_dict = {"early":[[5.0, 4.7, 5.7, 4.7, 5.7, 2.0, 5.7, 4.7, 6.3, 4.7, 4.3, 5.0, 4.7, 5.0, 5.7, 6.3, 3.7, 5.3, 5.3, 6.0, 4.0, 6.0, 6.7, 4.0, 6.0, 5.0, 5.7, 5.0, 1.7, 5.7],[5.3, 2.3, 3.3, 3.7, 3.3, 3.7, 4.7, 3.7, 3.0, 4.0, 4.0, 4.0, 5.7, 6.0, 6.0,5.0, 4.0, 3.7, 5.7, 4.7, 4.3, 3.0, 2.3, 3.7, 4.0, 3.0, 4.7, 2.3, 3.3, 3.3], [4.3, 5.3, 5.0, 5.7, 5.0, 2.7, 5.7, 3.3, 4.0, 4.0, 4.0, 3.0, 4.3, 4.3, 5.3]], "half":[[3.7, 3.7, 5.3, 3.0, 3.3, 3.3, 4.7, 4.3, 3.7, 3.7, 5.3, 5.7, 6.0, 3.0,2.7, 2.0, 4.0, 4.0, 3.0, 4.7, 5.7, 4.3, 3.0, 3.0],[3.7, 3.7, 3.7, 3.0, 3.0, 4.3, 2.3, 2.7, 3.0, 4.7, 3.7, 5.7, 6.7, 6.0, 5.3,4.0, 3.3, 3.7, 3.7, 3.0, 2.3, 4.7, 2.0, 3.3, 2.3, 5.7, 5.3, 3.3, 5.0, 5.3],[4.7, 4.0, 4.7, 4.3, 3.0, 4.0, 2.0, 2.7, 2.3, 1.7, 4.0, 5.7, 4.7, 4.3, 3.7]], "late":[[4.0, 6.3, 1.3, 3.3, 3.3, 6.3, 3.3, 2.7, 5.7, 2.0, 4.3, 6.0,5.3, 3.7, 4.0,  2.0, 4.7, 5.3, 3.7, 2.3, 4.0, 5.7, 5.3, 4.7, 2.3],[3.7, 4.7, 1.7, 4.7, 5.7, 3.0, 2.0, 4.7, 5.0, 5.3, 5.3, 5.0, 5.3, 4.7, 4.0,2.0, 1.7, 3.7, 3.3, 3.3, 4.3, 3.7, 3.3, 4.3, 3.3, 3.0, 3.7, 1.3, 4.3, 4.3],[2.0, 3.7, 2.0, 1.0, 4.7, 4.3, 4.3, 3.7, 3.7, 4.7, 4.0, 2.0, 4.3, 3.7, 3.3]]}
-    boxplot_three_groups_three_each(condition_dict, ["Interacted (MI)", "Not interacted (MI)", "History"], ['dimgrey', 'silver', 'whitesmoke'], "Consistency score")
+
+    # eval_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/sampled_eval_consis_psych.csv", index_col=0, usecols=["id", "stage", "interacted", "avg_consis"]).reset_index()
+    #
+    # eval_df = eval_df.loc[eval_df["id"].isin([35, 45, 63, 64, 70, 73, 91, 109, 118, 119, 120, 123, 125, 131, 137, 145, 185, 193, 223, 235, 236, 239, 242, 245, 246, 262, 269, 271, 276, 281, 282, 309, 321, 336, 341, 354, 356, 361, 373, 391, 142, 333, 189, 14, 299, 71, 381, 293, 174, 97, 368, 217, 237, 256, 60, 132, 379, 216, 308, 1, 94, 121, 386, 314, 226, 9, 188, 352, 300, 69, 182, 359, 290, 34, 15, 68, 80, 157, 181, 218, 240, 263, 199, 280, 61,287, 307, 186, 10, 298, 130, 143, 102, 326, 171, 252, 99, 12, 351, 135, 96, 203, 383, 79, 172, 127, 207, 330, 158, 7, 111, 203, 17, 274, 24, 65, 296, 164, 213, 23, 285, 128, 75, 254, 332, 316, 232, 8, 347, 42, 248, 38, 206, 22, 110, 288, 155, 177, 339, 86, 67, 225, 329, 13, 29, 261, 107, 53, 267, 345, 148, 190, 355, 5, 224, 388, 144, 375, 66, 140, 312, 88, 208, 169, 57, 44, 295, 2, 335, 21, 162, 18, 72, 210, 294])]
+
+    eval_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/sampled_eval_consis_psych.csv", index_col=0, usecols=["id", "stage", "interacted", "avg_consis"]).reset_index().dropna(axis=0, subset=["avg_consis"], how="all")
+    eval_df = eval_df.drop(eval_df[(eval_df["stage"]=="MI_early") & (eval_df["interacted"]=="Yes, I did.") & (eval_df["avg_consis"]==2.0)].index)
+    eval_df = eval_df.drop(eval_df[(eval_df["interacted"]=="No, I did not.") & (eval_df["avg_consis"]==1.7)].index)
+    eval_df = eval_df.drop(eval_df[(eval_df["interacted"]=="No, I did not.") & (eval_df["avg_consis"]==1.3)].index)
+    # eval_df = eval_df.loc[eval_df["id"].isin([35, 45, 63, 64, 70, 73, 91, 109, 118, 119, 120, 123, 125, 131, 137, 145, 185, 193, 223, 235, 236, 239, 242, 245, 246, 262, 269, 271, 276, 281, 282, 309, 321, 336, 341, 354, 356, 361, 373, 391, 142, 333, 189, 14, 299, 71, 381, 293, 174, 97, 368, 217, 237, 256, 60, 132, 379, 216, 308, 1, 94, 121, 386, 314, 226, 9, 188, 352, 300, 69, 182, 359, 290, 34, 15, 68, 80, 157, 181, 218, 240, 263, 199, 280, 61,287, 307, 186, 10, 298, 130, 143, 102, 326, 171, 252, 99, 12, 351, 135, 96, 203, 383, 79, 172, 127, 207, 330, 158, 7, 111, 203, 17, 274, 24, 65, 296, 164, 213, 23, 285, 128, 75, 254, 332, 316, 232, 8, 347, 42, 248, 38, 206, 22, 110, 288, 155, 177, 339, 86, 67, 225, 329, 13, 29, 261, 107, 53, 267, 345, 148, 190, 355, 5, 224, 388, 144, 375, 66, 140, 312, 88, 208, 169, 57, 44, 295, 2, 335, 21, 162, 18, 72, 210, 294])]
+    # merge_dict = {'MI': [6.0, 7.0, 3.5, 6.5, 5.0, 5.0, 6.0, 5.5, 6.5, 5.0, 6.0, 5.5, 5.5, 6.0], 'non_MI': [2.0, 4.5, 5.5, 5.0, 5.0, 6.0, 3.5, 5.0, 6.0, 6.0, 6.0, 3.5, 3.5, 5.0, 4.5]}
+    # plt.boxplot([merge_dict["MI"], merge_dict["non_MI"]], labels=["MI", "Non_MI"], showfliers=True, showmeans=True, meanprops={'marker':'o', "markerfacecolor":"black", "markeredgecolor": "black"}, sym="+")
+    # plt.show()
+    boxplot_three_groups_three_each(within_group_test(eval_df, "avg_consis"), ["Interacted", "Not interacted", "History"], ['dimgrey', 'silver', 'whitesmoke'], "Consistency score")
+    # boxplot_two_groups_three_each(within_group_test(eval_df, "avg_psych"), ["Early", "Half", "Late"], ['dimgrey', 'silver', 'whitesmoke'], "Professional score")
 
 
 
