@@ -152,7 +152,7 @@ def within_group_test(total_df, dependent_var):
     for key in list(merge_dict.keys()):
         merge_dict[key].append((condition_dict["MI"+"_"+key][0]))
     for key in list(merge_dict.keys()):
-        merge_dict[key].append((condition_dict["non_MI"+"_"+key][1]))
+        merge_dict[key].append((condition_dict["MI"+"_"+key][1]))
     for key in list(merge_dict.keys()):
         merge_dict[key].append(condition_dict["history_"+key])
     print(merge_dict)
@@ -210,6 +210,8 @@ def within_group_test(total_df, dependent_var):
         # what if we use Mann-Whitney test
         print("Kruskal-Wallis Test: ", stats.kruskal(value[0],value[1],value[2]))
         print("\n\n")
+
+        print("ANOVA Test: ", stats.f_oneway(value[0],value[1],value[2]))
 
     return merge_dict
 

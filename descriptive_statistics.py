@@ -2,7 +2,11 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import re
 import numpy as np
-from statistic_test import within_group_test, between_groups_test
+from scipy import stats
+from scipy.stats import levene
+import scikit_posthocs as sp
+from preprocess import total_eval_df
+from statistic_test import within_group_test, between_groups_test, normality_test
 import matplotlib
 matplotlib.rcParams.update({'font.size': 15})
 
@@ -110,32 +114,6 @@ def boxplot_two_groups_three_each(condition_dict, labels, colors, ylabel):
 
 
 
-def remove_append_utterances(total_df):
-
-    # this may filter out some messages that might appear to be empty in the system(due to the db connection issue maybe)
-    utterance_df = total_df.loc[:, ["id", "worker_utterance", "message_time", "msg_status", "mood"]].drop_duplicates().sort_values(by=["id", "message_time"])
-    unique_worker_id = list(utterance_df["id"].unique())
-    for id in unique_worker_id:
-        id_df = utterance_df.loc[(utterance_df["id"] == id)]
-        # first, we examine if a worker has multiple utterance status
-        if ((len(id_df) != 1) & ("Deleted" in id_df["msg_status"].values)):
-            # for each worker, we examine if an utterance was added and then deleted, if so, there must be two duplicated utterances
-            dup_utt = id_df.duplicated(subset=["id", "worker_utterance"], keep=False)
-            wait_to_check_status = list(id_df[dup_utt]["msg_status"].values)
-            for i in range(0, len(wait_to_check_status), 2):
-                if (((i+1)>=len(wait_to_check_status)) & (wait_to_check_status[i] == "Added")):
-                    continue
-                elif ((i%2 == 0) & (wait_to_check_status[i] == "Added") & ((i+1)%2!=0) & (wait_to_check_status[i+1] == "Deleted")):
-                    indexes = list(id_df[dup_utt].index)[i:i+2]
-                    utterance_df.drop(index = indexes, inplace=True)
-
-        # append all of the added utterances from one worker
-        utterance_df.loc[utterance_df["id"] == id, "final_msg"] = " ".join(utterance_df.loc[utterance_df["id"] == id]["worker_utterance"].values)
-    total_df = pd.merge(total_df, utterance_df.loc[:, ["id", "final_msg"]], on=["id"], how="outer")
-    total_df["final_msg"].fillna(value=total_df["worker_utterance"], inplace=True)
-    return total_df
-
-
 def len_utterance(total_df):
 
     utterance_df = total_df.loc[:, ["id", "final_msg", "mood", "interacted", "stage"]].drop_duplicates().sort_values(by=["id"])
@@ -177,23 +155,11 @@ def mood_interacted_df(utterance_df):
 
 
 def task_cxt_df(total_df, condition_dict):
-    scale_to_score = {
-        "Strongly Disagree": 0,
-        "Disagree": 1,
-        "Somewhat disagree": 2,
-        "Neither agree nor disagree": 3,
-        "Somewhat agree": 4,
-        "Agree": 5,
-        "Strongly agree": 6
-    }
 
     # bar_x = ["familiar_tech", "use_freq", "get_help", "explain_cxt", "cxt_flow", "reply_btn", "feel_control", "ling_cxt",  "seman_cxt", "cogn_cxt"]
 
     # only focus on the three dimensions of context in the following bar plot
     bar_x = ["ling_cxt",  "seman_cxt", "cogn_cxt"]
-
-    for col in bar_x:
-        total_df[col] = total_df[col].map(scale_to_score)
 
     # extract conditional variables and create list for data
     for key in condition_dict.keys():
@@ -281,7 +247,7 @@ def behavior_satis_df(total_df):
 
 
     # check who only clicked the bot icon, we named it as not actually interated
-    only_bot_icon_worker = list(b_name_df[b_name_df["id"].isin(b_name_df[(b_name_df["interacted_all_cxt"]==1)]["id"])]["id"])
+    only_bot_icon_worker = list(b_name_df[b_name_df["id"].isin(b_name_df[(b_name_df["interacted_prompt_cxt"]==1)]["id"])]["id"])
     print(only_bot_icon_worker)
 
     # # check which worker explored which cognitive cxt
@@ -320,16 +286,6 @@ def behavior_satis_df(total_df):
     return b_name_df.loc[:, ["id", "interacted_social_cxt", "interacted_ready_ling_cxt", "interacted_ling_cxt", "interacted_seman_cxt", "interacted_ready_cog_cxt", "interacted_cog_cxt", "interacted_prompt_cxt", "interacted_all_cxt", "click_bot_icon"]]
 
 
-def behavior_agreement_df(total_df, b_name_df):
-    b_agree_df = pd.merge(total_df, b_name_df, on="id", how="outer")
-    print(b_agree_df.head())
-
-
-def after_merge_msg_df(total_df):
-    # the following process is based on the principle that one worker has one final utterance
-    total_df = remove_append_utterances(total_df)
-    total_df.to_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/total_df.csv")
-
 
 def plain_three_groups_boxplot(condition_dict, ylabel, labels):
     boxes = list(condition_dict.values())
@@ -338,26 +294,187 @@ def plain_three_groups_boxplot(condition_dict, ylabel, labels):
     plt.show()
 
 
+def find_low_consis_patterns(total_eval_df, b_name_df):
+    def cxt_type_ratio(stage_pattern, b_name_df, total_eval_df):
+        # calculate the ratio of interaction cxt type
+        interacted_cxt_types = list(b_name_df.columns)
+        interacted_cxt_types.remove("id")
+        for cxt in interacted_cxt_types:
+            cxt_ratio = round(b_name_df.loc[b_name_df["id"].isin(list(stage_pattern["id"].values))][cxt].sum(axis=0)/len(stage_pattern),3)
+            print("Ratio of cxt %s in group %s"%(cxt, stage_pattern["stage"].unique()), cxt_ratio)
+
+        var_df = total_eval_df.loc[total_eval_df["id"].isin(list(stage_pattern["id"].values))].drop_duplicates(["id"])
+        print("Number of samples in this group: ", len(var_df))
+        var_pattern = var_df[["spent_time", "satis_score", "mean_ueq", "mean_pragmatic", "mean_hedonic", "mean_task_load", "familiar_tech", "use_freq", "get_help", "explain_cxt", "cxt_flow", "reply_btn", "feel_control", "ling_cxt",  "seman_cxt", "cogn_cxt"]].mean(axis=0)
+        print(var_pattern)
+
+
+        var_dict = {}
+        for var in ["spent_time", "satis_score", "mean_ueq", "mean_pragmatic", "mean_hedonic", "mean_task_load", "familiar_tech", "use_freq", "get_help", "explain_cxt", "cxt_flow", "reply_btn", "feel_control", "ling_cxt",  "seman_cxt", "cogn_cxt"]:
+            var_dict.setdefault(var, list(var_df[var].values))
+        return var_dict
+
+    # list avg_consistency scores for each group across stages and interacted types
+    avg_consis_groups = pd.pivot_table(total_eval_df, index=["stage", "actual_interacted"], values=["avg_consis",  "spent_time", "satis_score", "mean_ueq", "mean_pragmatic", "mean_hedonic", "mean_task_load"], aggfunc=np.mean)
+    print("Var scores for each group: ", avg_consis_groups)
+
+
+    # we finally included one history-late group as the control group
+    stage_history = total_eval_df.loc[(total_eval_df["stage"]=="main_history_early")].drop_duplicates(["id"])
+    stage_history["pattern"] = "history"
+    print(len(stage_history))
+    history_dict = {}
+    for var in ["spent_time", "satis_score", "mean_ueq", "mean_pragmatic", "mean_hedonic", "mean_task_load"]:
+        history_dict.setdefault(var, list(stage_history[var].values))
+
+    # "main_MI_early", "main_MI_half", "main_non_MI_early", "main_non_MI_half",
+    for stage in ["main_MI_early", "main_non_MI_early"]:
+        avg_consis = avg_consis_groups.loc[stage, "TRUE"]["avg_consis"]
+
+        # e.g. define two groups where one is lower than the avg consistency and the other one is higher. So then we check what happened in each group in terms of other variables;
+        stage_low = total_eval_df.loc[(total_eval_df["avg_consis"]<avg_consis) & (total_eval_df["stage"]==stage) & (total_eval_df["actual_interacted"]=="TRUE")].drop_duplicates(["id"])
+        stage_high = total_eval_df.loc[(total_eval_df["avg_consis"]>=avg_consis) & (total_eval_df["stage"]==stage) & (total_eval_df["actual_interacted"]=="TRUE")].drop_duplicates(["id"])
+
+
+        print("Low group: ")
+        low_dict = cxt_type_ratio(stage_low, b_name_df, total_eval_df)
+        print("\n")
+        print("High group: ")
+        high_dict = cxt_type_ratio(stage_high, b_name_df, total_eval_df)
+        for var in low_dict.keys():
+            print(stats.mannwhitneyu(x=low_dict[var], y=high_dict[var]))
+        stage_low["pattern"] = "low"
+        stage_high["pattern"] = "high"
+
+        for var in history_dict.keys():
+            dunn_df = pd.concat([stage_low, stage_high, stage_history], axis=0)
+            print(sp.posthoc_dunn(dunn_df,  var, "pattern", "bonferroni"))
+
+
+            print(var)
+            print("shapiro for low",stats.shapiro(low_dict[var]))
+            print("shapiro for high",stats.shapiro(high_dict[var]))
+            print("shapiro for history", stats.shapiro(history_dict[var]))
+            print("\n")
+            print("Variance check", stats.levene(high_dict[var], history_dict[var]))
+            print("\n")
+            print(stats.mannwhitneyu(x=high_dict[var], y=history_dict[var]))
+            print("T-test", stats.ttest_ind(high_dict[var], history_dict[var]))
+            print("Kruskal", stats.kruskal(low_dict[var], high_dict[var], history_dict[var]))
+            print("One-way", stats.f_oneway(low_dict[var], high_dict[var], history_dict[var]))
+            print("\n\n")
+        print("\n\n")
+
+
+
+
+    # print("Comments of ContextBot or the system", MI_late_low[["id", "comment_contextbot", "comment_system", "preprogrammed"]])
+
+    # print("Comments of ContextBot or the system", MI_late_high[["id", "comment_contextbot", "comment_system", "preprogrammed"]])
+
+
+def trade_off_consis_time(total_eval_df):
+    '''
+    divided the group into highly and lowly consistent, test the time difference
+    :param total_eval_df:
+    :return:
+    '''
+    highly_consis = total_eval_df[(total_eval_df["actual_interacted"] == "TRUE") & (total_eval_df["avg_consis"]>4)].drop_duplicates("id")
+    lowly_consis = total_eval_df[(total_eval_df["actual_interacted"] == "TRUE") & (total_eval_df["avg_consis"]<=4)].drop_duplicates("id")
+
+    # for history, highly and lowly consistent
+    highly_consis_his = total_eval_df[(total_eval_df["actual_interacted"] == "Unknown") & (total_eval_df["avg_consis"]>4)].drop_duplicates("id")
+    lowly_consis_his = total_eval_df[(total_eval_df["actual_interacted"] == "Unknown") & (total_eval_df["avg_consis"]<=4)].drop_duplicates("id")
+    print(highly_consis_his)
+    print(lowly_consis_his)
+
+
+    for stage in ["main_history_early", "main_history_half", "main_history_late"]:
+        highly_g_h = list(highly_consis_his[highly_consis_his["stage"]==stage]["spent_time"].values)
+        lowly_g_h = list(lowly_consis_his[lowly_consis_his["stage"]==stage]["spent_time"].values)
+
+
+        print(stage)
+        print("avg highly", np.mean(highly_g_h), np.std(highly_g_h))
+        print("avg lowly", np.mean(lowly_g_h), np.std(lowly_g_h))
+
+        if len(highly_g_h)>=3:
+            print("shapiro for high",stats.shapiro(highly_g_h))
+        if len(lowly_g_h)>=3:
+
+            print("shapiro for low",stats.shapiro(lowly_g_h))
+        print("\n")
+        print(stats.mannwhitneyu(highly_g_h, lowly_g_h))
+
+
+    # for stage in ["main_MI_early", "main_MI_half", "main_MI_late", "main_non_MI_early", "main_non_MI_half", "main_non_MI_late"]:
+    #     highly_g = list(highly_consis[highly_consis["stage"]==stage]["spent_time"].values)
+    #     lowly_g = list(lowly_consis[lowly_consis["stage"]==stage]["spent_time"].values)
+    #
+    #     print(stage)
+    #     print("avg highly", np.mean(highly_g), np.std(highly_g))
+    #     print("avg lowly", np.mean(lowly_g), np.std(lowly_g))
+    #
+    #     if len(highly_g)>=3:
+    #         print("shapiro for high",stats.shapiro(highly_g))
+    #     if len(lowly_g)>=3:
+    #
+    #         print("shapiro for low",stats.shapiro(lowly_g))
+    #
+    #     print("\n")
+    #     if ((len(highly_g)>=3) & (len(lowly_g)>=3)):
+    #         # print("Variance check", stats.levene(highly_g, lowly_g))
+    #         print("\n")
+    #         print(stats.kruskal(highly_g, lowly_g, history_late_time))
+    #         # print("T-test", stats.ttest_ind(highly_g, lowly_g))
+    #         print("\n\n")
+    #
+
+
+def qualitative_feedback(total_eval_df):
+
+    feedback_df = total_eval_df.dropna(subset=["comment_system", "comment_contextbot"], how="all", axis=0).drop_duplicates("id").loc[:, ["id", "stage", "spent_time", "final_msg", "interacted", "comment_system", "comment_contextbot"]]
+    print(feedback_df[["comment_system"]].values)
+
+
 if __name__ == "__main__":
-    total_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/final_df.csv")
-    # behavior_satis_df(remove_append_utterances(total_df))
-    # print(behavior_satis_df(remove_append_utterances(total_df)))
+    total_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/total_df.csv", index_col=0)
+
+    eval_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/sampled_eval_consis_psych.csv", index_col=0, usecols=["id", "stage", "interacted", "avg_consis"]).reset_index()
+
+    b_name_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/b_name_df.csv", index_col=0)
+
+    # remove outliers of consistency scores
+    eval_df = eval_df.drop(eval_df[(eval_df["stage"]=="MI_early") & (eval_df["interacted"]=="Yes, I did.") & (eval_df["avg_consis"]==2.0)].index)
+    eval_df = eval_df.drop(eval_df[(eval_df["stage"]=="MI_late") & (eval_df["interacted"]=="No, I did not.") & (eval_df["avg_consis"]==1.7)].index)
+    # boxplot_three_groups_three_each(within_group_test(eval_df, "avg_consis"), ["Interacted (MI)", "Not interacted (MI)", "History"], ['dimgrey', 'silver', 'whitesmoke'], "Consistency score")
+    total_eval = total_eval_df(total_df, eval_df)
+    # find_low_consis_patterns(total_eval, b_name_df)
+    # trade_off_consis_time(total_eval)
+    qualitative_feedback(total_eval)
+
+
+
+
+
+
     # task_load_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/task_load.csv", index_col=0)
     # ueq_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/ueq.csv", index_col=0)
 
-    # eval_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/sampled_eval_consis_psych.csv", index_col=0, usecols=["id", "stage", "interacted", "avg_consis"]).reset_index()
-    #
-    # eval_df = eval_df.loc[eval_df["id"].isin([35, 45, 63, 64, 70, 73, 91, 109, 118, 119, 120, 123, 125, 131, 137, 145, 185, 193, 223, 235, 236, 239, 242, 245, 246, 262, 269, 271, 276, 281, 282, 309, 321, 336, 341, 354, 356, 361, 373, 391, 142, 333, 189, 14, 299, 71, 381, 293, 174, 97, 368, 217, 237, 256, 60, 132, 379, 216, 308, 1, 94, 121, 386, 314, 226, 9, 188, 352, 300, 69, 182, 359, 290, 34, 15, 68, 80, 157, 181, 218, 240, 263, 199, 280, 61,287, 307, 186, 10, 298, 130, 143, 102, 326, 171, 252, 99, 12, 351, 135, 96, 203, 383, 79, 172, 127, 207, 330, 158, 7, 111, 203, 17, 274, 24, 65, 296, 164, 213, 23, 285, 128, 75, 254, 332, 316, 232, 8, 347, 42, 248, 38, 206, 22, 110, 288, 155, 177, 339, 86, 67, 225, 329, 13, 29, 261, 107, 53, 267, 345, 148, 190, 355, 5, 224, 388, 144, 375, 66, 140, 312, 88, 208, 169, 57, 44, 295, 2, 335, 21, 162, 18, 72, 210, 294])]
 
-    eval_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/sampled_eval_consis_psych.csv", index_col=0, usecols=["id", "stage", "interacted", "avg_consis"]).reset_index().dropna(axis=0, subset=["avg_consis"], how="all")
-    eval_df = eval_df.drop(eval_df[(eval_df["stage"]=="MI_early") & (eval_df["interacted"]=="Yes, I did.") & (eval_df["avg_consis"]==2.0)].index)
-    eval_df = eval_df.drop(eval_df[(eval_df["interacted"]=="No, I did not.") & (eval_df["avg_consis"]==1.7)].index)
-    eval_df = eval_df.drop(eval_df[(eval_df["interacted"]=="No, I did not.") & (eval_df["avg_consis"]==1.3)].index)
-    # eval_df = eval_df.loc[eval_df["id"].isin([35, 45, 63, 64, 70, 73, 91, 109, 118, 119, 120, 123, 125, 131, 137, 145, 185, 193, 223, 235, 236, 239, 242, 245, 246, 262, 269, 271, 276, 281, 282, 309, 321, 336, 341, 354, 356, 361, 373, 391, 142, 333, 189, 14, 299, 71, 381, 293, 174, 97, 368, 217, 237, 256, 60, 132, 379, 216, 308, 1, 94, 121, 386, 314, 226, 9, 188, 352, 300, 69, 182, 359, 290, 34, 15, 68, 80, 157, 181, 218, 240, 263, 199, 280, 61,287, 307, 186, 10, 298, 130, 143, 102, 326, 171, 252, 99, 12, 351, 135, 96, 203, 383, 79, 172, 127, 207, 330, 158, 7, 111, 203, 17, 274, 24, 65, 296, 164, 213, 23, 285, 128, 75, 254, 332, 316, 232, 8, 347, 42, 248, 38, 206, 22, 110, 288, 155, 177, 339, 86, 67, 225, 329, 13, 29, 261, 107, 53, 267, 345, 148, 190, 355, 5, 224, 388, 144, 375, 66, 140, 312, 88, 208, 169, 57, 44, 295, 2, 335, 21, 162, 18, 72, 210, 294])]
+    # eval_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/sampled_eval_consis_psych.csv", index_col=0, usecols=["id", "stage", "interacted", "avg_consis"]).reset_index().dropna(axis=0, subset=["avg_consis"], how="all")
+
+    # eval_df = eval_df.drop(eval_df[(eval_df["stage"]=="non_MI_early") & (eval_df["interacted"]=="Yes, I did.") & (eval_df["avg_consis"]==1.7)].index)
+    # eval_df = eval_df.drop(eval_df[(eval_df["stage"]=="MI_late") & (eval_df["interacted"]=="No, I did not.") & (eval_df["avg_consis"]==2.0)].index)
+
+    # eval_df = eval_df.drop(eval_df[(eval_df["interacted"]=="No, I did not.") & (eval_df["avg_consis"]==1.3)].index)
+
+    # all_interacted_worker = [35, 45, 63, 64, 70, 73, 91, 109, 118, 119, 120, 123, 125, 131, 137, 145, 185, 193, 223, 235, 236, 239, 242, 245, 246, 262, 269, 271, 276, 281, 282, 309, 321, 336, 341, 354, 356, 361, 373, 391]
+    # eval_df = eval_df.loc[(eval_df["id"].isin(all_interacted_worker)) | (eval_df["interacted"] == "No, I did not.") | (eval_df["stage"] == "history_early") | (eval_df["stage"] == "history_half") | (eval_df["stage"] == "history_late")]
     # merge_dict = {'MI': [6.0, 7.0, 3.5, 6.5, 5.0, 5.0, 6.0, 5.5, 6.5, 5.0, 6.0, 5.5, 5.5, 6.0], 'non_MI': [2.0, 4.5, 5.5, 5.0, 5.0, 6.0, 3.5, 5.0, 6.0, 6.0, 6.0, 3.5, 3.5, 5.0, 4.5]}
     # plt.boxplot([merge_dict["MI"], merge_dict["non_MI"]], labels=["MI", "Non_MI"], showfliers=True, showmeans=True, meanprops={'marker':'o', "markerfacecolor":"black", "markeredgecolor": "black"}, sym="+")
     # plt.show()
-    boxplot_three_groups_three_each(within_group_test(eval_df, "avg_consis"), ["Interacted", "Not interacted", "History"], ['dimgrey', 'silver', 'whitesmoke'], "Consistency score")
+
     # boxplot_two_groups_three_each(within_group_test(eval_df, "avg_psych"), ["Early", "Half", "Late"], ['dimgrey', 'silver', 'whitesmoke'], "Professional score")
 
 

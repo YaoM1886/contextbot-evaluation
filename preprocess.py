@@ -24,7 +24,6 @@ post_survey = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThes
 pre_survey.rename(columns={"Q10_1": "mood", "Q7": "prolific_id"}, inplace=True)
 post_survey.rename(columns={"Q7":"prolific_id", "Q9": "interacted", "Q6_1":"familiar_tech", "Q6_2":"use_freq", "Q6_3":"get_help", "QID1_1":"explain_cxt", "QID1_2":"cxt_flow", "QID1_3": "reply_btn", "QID1_4": "feel_control", "QID1_5":"ling_cxt", "QID1_6": "seman_cxt", "QID1_7": "attent_check1", "QID1_8": "cogn_cxt", "Q10": "comment_contextbot", "Q11": "attent_check2", "Q4_1":"satis_score", "Q5":"comment_system", "Q12":"preprogrammed"}, inplace=True)
 
-
 def link_surveys_table(table, pre_survey, post_survey):
     '''
     link pre-task survey, post-task survey with db tables
@@ -156,7 +155,6 @@ def add_actual_interacted_col(total_df, not_valid_id):
     return total_df
 
 
-
 def check_attention_q(total_df):
 
     # create the df with necessary info for checking the quality
@@ -250,22 +248,6 @@ def preprocess_tables_surveys():
     return total_df
 
 
-def eval_ueq(total_df):
-    ueq_df = total_df.loc[:, ["id", "prolific_id", "stage", "spent_time", "interacted", "preprogrammed", "Q2_1", "Q2_2", "Q2_3", "Q2_4", "Q2_5", "Q2_6", "Q2_7", "Q2_8", "satis_score"]].drop_duplicates()
-    ueq_df["mean_pragmatic"] = round((ueq_df[["Q2_1", "Q2_2", "Q2_3", "Q2_4"]].sum(axis=1))/4, 3)
-    ueq_df["mean_hedonic"] = round((ueq_df[["Q2_5", "Q2_6", "Q2_7", "Q2_8"]].sum(axis=1))/4, 3)
-    ueq_df["mean_ueq"] = round((ueq_df[["Q2_1", "Q2_2", "Q2_3", "Q2_4", "Q2_5", "Q2_6", "Q2_7", "Q2_8"]].sum(axis=1))/8, 3)
-    ueq_df.to_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/ueq.csv")
-    return ueq_df
-
-
-def task_cognitive_load(total_df):
-    task_load_df = total_df.loc[:, ["id", "prolific_id", "stage", "spent_time", "interacted", "preprogrammed", "Q3_1", "Q3_2", "Q3_3", "Q3_4", "Q3_5", "Q3_6", "satis_score"]].drop_duplicates()
-    task_load_df["mean_task_load"] = round((task_load_df[["Q3_1", "Q3_2", "Q3_3", "Q3_4", "Q3_5", "Q3_6"]].sum(axis=1))/6, 3)
-    task_load_df.to_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/task_load.csv")
-    return total_df
-
-
 def random_msg_sample():
     # randomly select msg samples for the workers and psychologists
     total_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/total_df.csv", index_col=0)
@@ -295,6 +277,7 @@ def random_msg_sample():
 def total_human_eval_df():
     '''
     merge worker eval tables about consistency with the sampled_msg table, then for each msg, we have a mean score of three unique workers; for each msg, we can also track the worker id and the stage, interacted types.
+    return: df with sampled msg, id, stage, interacted types, consistency scores
     '''
 
     sampled_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/sampled_msg_df_v3_75.csv", index_col=0).sort_index()
@@ -322,11 +305,95 @@ def total_human_eval_df():
     return sampled_eval_df
 
 
+def remove_append_utterances(total_df):
+    # this may filter out some messages that might appear to be empty in the system(due to the db connection issue maybe)
+    utterance_df = total_df.loc[:, ["id", "worker_utterance", "message_time", "msg_status", "mood"]].drop_duplicates().sort_values(by=["id", "message_time"])
+    unique_worker_id = list(utterance_df["id"].unique())
+    for id in unique_worker_id:
+        id_df = utterance_df.loc[(utterance_df["id"] == id)]
+        # first, we examine if a worker has multiple utterance status
+        if ((len(id_df) != 1) & ("Deleted" in id_df["msg_status"].values)):
+            # for each worker, we examine if an utterance was added and then deleted, if so, there must be two duplicated utterances
+            dup_utt = id_df.duplicated(subset=["id", "worker_utterance"], keep=False)
+            wait_to_check_status = list(id_df[dup_utt]["msg_status"].values)
+            for i in range(0, len(wait_to_check_status), 2):
+                if (((i+1)>=len(wait_to_check_status)) & (wait_to_check_status[i] == "Added")):
+                    continue
+                elif ((i%2 == 0) & (wait_to_check_status[i] == "Added") & ((i+1)%2!=0) & (wait_to_check_status[i+1] == "Deleted")):
+                    indexes = list(id_df[dup_utt].index)[i:i+2]
+                    utterance_df.drop(index = indexes, inplace=True)
+
+        # append all of the added utterances from one worker
+        utterance_df.loc[utterance_df["id"] == id, "final_msg"] = " ".join(utterance_df.loc[utterance_df["id"] == id]["worker_utterance"].values)
+    total_df = pd.merge(total_df, utterance_df.loc[:, ["id", "final_msg"]], on=["id"], how="outer")
+    total_df["final_msg"].fillna(value=total_df["worker_utterance"], inplace=True)
+    total_df.to_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/total_df.csv", index_col=0)
+    return total_df
+
+
+def convert_var():
+    total_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/total_df.csv", index_col=0)
+    total_df["mean_task_load"] = round((total_df[["Q3_1", "Q3_2", "Q3_3", "Q3_4", "Q3_5", "Q3_6"]].sum(axis=1))/6, 3)
+    total_df["mean_ueq"] = round((total_df[["Q2_1", "Q2_2", "Q2_3", "Q2_4", "Q2_5", "Q2_6", "Q2_7", "Q2_8"]].sum(axis=1))/8, 3)
+    total_df["mean_pragmatic"] = round((total_df[["Q2_1", "Q2_2", "Q2_3", "Q2_4"]].sum(axis=1))/4, 3)
+    total_df["mean_hedonic"] = round((total_df[["Q2_5", "Q2_6", "Q2_7", "Q2_8"]].sum(axis=1))/4, 3)
+    total_df.drop(["attent_check1", "attent_check2"], axis=1, inplace=True)
+
+    # these workers only clicked the bot icon and saw the greeting, without knowing any context content
+    total_df.loc[total_df["id"].isin([108, 204, 376, 378]), "actual_interacted"] = "False"
+
+    # scale agreement to scores, with ranks
+    scale_to_score = {
+        "Strongly Disagree": 0,
+        "Disagree": 1,
+        "Somewhat disagree": 2,
+        "Neither agree nor disagree": 3,
+        "Somewhat agree": 4,
+        "Agree": 5,
+        "Strongly agree": 6
+    }
+
+    scaled_col = ["familiar_tech", "use_freq", "get_help", "explain_cxt", "cxt_flow", "reply_btn", "feel_control", "ling_cxt", "seman_cxt", "cogn_cxt"]
+    for col in scaled_col:
+        total_df[col] = total_df[col].map(scale_to_score)
+
+    total_df.to_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/total_df.csv")
+
+    return total_df
+
+
+def eval_ueq(total_df):
+    ueq_df = total_df.loc[:, ["id", "prolific_id", "stage", "spent_time", "interacted", "preprogrammed", "mean_ueq", "mean_pragmatic", "mean_hedonic", "satis_score"]].drop_duplicates()
+    ueq_df.to_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/ueq.csv")
+    return ueq_df
+
+
+def task_cognitive_load(total_df):
+    task_load_df = total_df.loc[:, ["id", "prolific_id", "stage", "spent_time", "interacted", "preprogrammed", "mean_task_load", "satis_score"]].drop_duplicates()
+    task_load_df.to_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/task_load.csv")
+    return total_df
+
+def total_eval_df(total_df, eval_df):
+    # only clicked the bot icon, so we don't use these three for consistency calculation
+    eval_df = eval_df.loc[~eval_df["id"].isin([376, 378])]
+    # add consistency score column to the total_df
+    total_eval_df = pd.merge(total_df, eval_df.loc[:, ["id", "avg_consis"]], on="id", how="left")
+    return total_eval_df
 
 
 if __name__ == "__main__":
     # preprocess the table and surveys, get the final data
-    total_df = preprocess_tables_surveys()
+    total_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/total_df.csv", index_col=0)
+    eval_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/sampled_eval_consis_psych.csv", index_col=0, usecols=["id", "stage", "interacted", "avg_consis"]).reset_index()
+
+    print(eval_df)
+
+
+
+
+    all_interacted_worker = [35, 45, 63, 64, 70, 73, 91, 109, 118, 119, 120, 123, 125, 131, 137, 145, 185, 193, 223, 235, 236, 239, 242, 245, 246, 262, 269, 271, 276, 281, 282, 309, 321, 336, 341, 354, 356, 361, 373, 391]
+    all_followed_worker = [35, 45, 63, 64, 70, 73, 90, 91, 92, 109, 118, 119, 120, 123, 125, 131, 137, 138, 145, 153, 185, 193, 223, 228, 235, 236, 239, 242, 245, 246, 259, 262, 265, 269, 271, 275, 276, 281, 282, 286, 309, 318, 321, 325, 336, 341, 350, 354, 356, 361, 365, 366, 373, 391]
+
 
     # df = pd.DataFrame(psych_eval_df.iloc[:, 50:].T.values.astype(int))
     # print(df)
