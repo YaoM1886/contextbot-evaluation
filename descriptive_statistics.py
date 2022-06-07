@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 import re
 import numpy as np
 from scipy import stats
+import matplotlib.gridspec as gridspec
+import seaborn as sns
 from scipy.stats import levene
 import scikit_posthocs as sp
 from preprocess import total_eval_df
@@ -436,26 +438,85 @@ def qualitative_feedback(total_eval_df):
     feedback_df = total_eval_df.dropna(subset=["comment_system", "comment_contextbot"], how="all", axis=0).drop_duplicates("id").loc[:, ["id", "stage", "spent_time", "final_msg", "interacted", "comment_system", "comment_contextbot"]]
     print(feedback_df[["comment_system"]].values)
 
+def boxplot_matrix_cxt_stage(df1, df2, df3, df4):
+
+    fig = plt.figure(figsize=(22,5))
+    gs1 = gridspec.GridSpec(1, 4)
+    gs1.update(wspace=0.03)
+    ax1 = plt.subplot(gs1[0, 0])
+    ax2 = plt.subplot(gs1[0, 1])
+    ax3 = plt.subplot(gs1[0, 2])
+    ax4 = plt.subplot(gs1[0, 3])
+    props = dict(boxes="silver", whiskers="black", medians="r", caps="black")
+    df1.boxplot(ax=ax1, vert=False, showmeans=True, meanprops={'marker':'o', "markerfacecolor":"black", "markeredgecolor": "black"}, sym="+", color=props, patch_artist=True)
+    ax1.set_yticklabels(["Social", "Social&linguistic", "Social&linguistic\n&semantic", "Social&linguistic\n&semantic&cognitive", "All context\n&psychotherapy\ntechniques"])
+
+    ax1.set_xlabel("Consistency score")
+    df2.boxplot(ax=ax2, vert=False, showmeans=True, meanprops={'marker':'o', "markerfacecolor":"black", "markeredgecolor": "black"}, sym="+", color=props, patch_artist=True)
+    ax2.set_xlabel("Mean UEQ")
+    df3.boxplot(ax=ax3, vert=False, showmeans=True, meanprops={'marker':'o', "markerfacecolor":"black", "markeredgecolor": "black"}, sym="+", color=props, patch_artist=True)
+    ax3.set_xlabel("Mean task load")
+    df4.boxplot(ax=ax4, vert=False, showmeans=True, meanprops={'marker':'o', "markerfacecolor":"black", "markeredgecolor": "black"}, sym="+", color=props, patch_artist=True)
+    ax4.set_xlabel("Satisfaction score")
+
+
+    for ax in [ax1, ax2, ax3, ax4]:
+        ax.label_outer()
+    plt.show()
+
+
+def boxplot_cxt(b_name_df, dep_var):
+    '''
+    :param b_name_df:
+    :param dep_var:
+    :return: a df with cxt type as column, and value as the dependent variable we would examine
+    '''
+
+    cxt_type_dict = ["click_bot_icon", "interacted_social_cxt", "interacted_ready_ling_cxt"]
+    box_dict = dict.fromkeys(cxt_type_dict)
+    for i in range(0, len(cxt_type_dict)-1):
+        box_dict[cxt_type_dict[i]] = list(b_name_df[b_name_df["id"].isin(b_name_df[(b_name_df[cxt_type_dict[i]]==1) & (b_name_df[cxt_type_dict[i+1]]==0)]["id"])][dep_var].values)
+
+    box_dict["soc_ling"] = list(b_name_df[b_name_df["id"].isin(b_name_df[(b_name_df["interacted_ling_cxt"]==1) & (b_name_df["interacted_seman_cxt"]==0)]["id"])][dep_var].values)
+    box_dict["soc_ling_seman"] = list(b_name_df[b_name_df["id"].isin(b_name_df[(b_name_df["interacted_ling_cxt"]==1) & (b_name_df["interacted_cog_cxt"]==0) & (b_name_df["interacted_seman_cxt"]==1)]["id"])][dep_var].values)
+    box_dict["soc_ling_seman_cog"] = list(b_name_df[b_name_df["id"].isin(b_name_df[(b_name_df["interacted_ling_cxt"]==1) & (b_name_df["interacted_cog_cxt"]==1) & (b_name_df["interacted_prompt_cxt"]==0)]["id"])][dep_var].values)
+    box_dict["all_cxt"] = list(b_name_df[b_name_df["id"].isin(b_name_df[(b_name_df["interacted_all_cxt"]==1)]["id"])][dep_var].values)
+
+    del box_dict["interacted_ready_ling_cxt"]
+    del box_dict["click_bot_icon"]
+
+    df = pd.DataFrame({key:pd.Series(value) for key, value in box_dict.items() })
+
+    return df
+
+
 
 if __name__ == "__main__":
     total_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/total_df.csv", index_col=0)
-
     eval_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/sampled_eval_consis_psych.csv", index_col=0, usecols=["id", "stage", "interacted", "avg_consis"]).reset_index()
-
     b_name_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/b_name_df.csv", index_col=0)
 
     # remove outliers of consistency scores
     eval_df = eval_df.drop(eval_df[(eval_df["stage"]=="MI_early") & (eval_df["interacted"]=="Yes, I did.") & (eval_df["avg_consis"]==2.0)].index)
     eval_df = eval_df.drop(eval_df[(eval_df["stage"]=="MI_late") & (eval_df["interacted"]=="No, I did not.") & (eval_df["avg_consis"]==1.7)].index)
-    # boxplot_three_groups_three_each(within_group_test(eval_df, "avg_consis"), ["Interacted (MI)", "Not interacted (MI)", "History"], ['dimgrey', 'silver', 'whitesmoke'], "Consistency score")
+
     total_eval = total_eval_df(total_df, eval_df)
+
+    # merge consis, total with context df
+    total_eval_cxt = pd.merge(total_eval, b_name_df, on=["id"], how="left").drop_duplicates("id")
+    # only study the interacted workers for context types
+    total_eval_cxt = total_eval_cxt.loc[(total_eval_cxt["actual_interacted"]=="TRUE") & (total_eval_cxt["stage"]=="main_non_MI_late")]
+
+    boxplot_matrix_cxt_stage(boxplot_cxt(total_eval_cxt, "avg_consis"), boxplot_cxt(total_eval_cxt, "mean_ueq"), boxplot_cxt(total_eval_cxt, "mean_task_load"), boxplot_cxt(total_eval_cxt, "satis_score"))
+
+
+
+
+
+
+
     # find_low_consis_patterns(total_eval, b_name_df)
     # trade_off_consis_time(total_eval)
-    qualitative_feedback(total_eval)
-
-
-
-
 
 
     # task_load_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/task_load.csv", index_col=0)
@@ -475,7 +536,7 @@ if __name__ == "__main__":
     # plt.boxplot([merge_dict["MI"], merge_dict["non_MI"]], labels=["MI", "Non_MI"], showfliers=True, showmeans=True, meanprops={'marker':'o', "markerfacecolor":"black", "markeredgecolor": "black"}, sym="+")
     # plt.show()
 
-    # boxplot_two_groups_three_each(within_group_test(eval_df, "avg_psych"), ["Early", "Half", "Late"], ['dimgrey', 'silver', 'whitesmoke'], "Professional score")
+    # boxplot_three_groups_three_each(within_group_test(eval_df, "avg_consis"), ["Early", "Half", "Late"], ['dimgrey', 'silver', 'whitesmoke'], "Consistency score")
 
 
 

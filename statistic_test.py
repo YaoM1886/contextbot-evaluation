@@ -150,9 +150,9 @@ def within_group_test(total_df, dependent_var):
     merge_dict = {"early":[], "half":[], "late":[]}
     # +(condition_dict["non_MI"+"_"+key][1])
     for key in list(merge_dict.keys()):
-        merge_dict[key].append((condition_dict["MI"+"_"+key][0]))
+        merge_dict[key].append((condition_dict["MI"+"_"+key][0])+(condition_dict["non_MI"+"_"+key][0]))
     for key in list(merge_dict.keys()):
-        merge_dict[key].append((condition_dict["MI"+"_"+key][1]))
+        merge_dict[key].append((condition_dict["MI"+"_"+key][1])+(condition_dict["non_MI"+"_"+key][1]))
     for key in list(merge_dict.keys()):
         merge_dict[key].append(condition_dict["history_"+key])
     print(merge_dict)

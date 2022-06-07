@@ -381,6 +381,8 @@ def total_eval_df(total_df, eval_df):
     return total_eval_df
 
 
+
+
 if __name__ == "__main__":
     # preprocess the table and surveys, get the final data
     total_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/total_df.csv", index_col=0)
