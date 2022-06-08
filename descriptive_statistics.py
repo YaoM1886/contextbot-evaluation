@@ -4,6 +4,7 @@ import re
 import numpy as np
 from scipy import stats
 import matplotlib.gridspec as gridspec
+
 import seaborn as sns
 from scipy.stats import levene
 import scikit_posthocs as sp
@@ -32,11 +33,11 @@ def extract_conditional_df(total_df, condition_dict, condition_boxes):
 
 def boxplot_three_groups_three_each(condition_dict, labels, colors, ylabel):
     # boxplot of the nine stages and their spent time of the task
-    x_positions_fmt = ["Early*", "Half", "Late"]
+    x_positions_fmt = ["MI", "Non-MI", "History*"]
 
-    bplot = plt.boxplot(condition_dict["early"], labels=labels, positions=(1, 1.4, 1.8), widths=0.3, patch_artist=True, showmeans=True, meanprops={'marker':'o', "markerfacecolor":"black", "markeredgecolor": "black"}, sym="+")
-    bplot2 = plt.boxplot(condition_dict["half"], labels=labels, positions=(2.5, 2.9, 3.3), widths=0.3, patch_artist=True, showmeans=True, meanprops={'marker':'o', "markerfacecolor":"black", "markeredgecolor": "black"}, sym="+")
-    bplot3 = plt.boxplot(condition_dict["late"], labels=labels, positions=(4, 4.4, 4.8), widths=0.3, patch_artist=True, showmeans=True, meanprops={'marker':'o', "markerfacecolor":"black", "markeredgecolor": "black"}, sym="+")
+    bplot = plt.boxplot(condition_dict["MI"], labels=labels, positions=(1, 1.4, 1.8), widths=0.3, patch_artist=True, showmeans=True, meanprops={'marker':'o', "markerfacecolor":"black", "markeredgecolor": "black"}, sym="+")
+    bplot2 = plt.boxplot(condition_dict["non_MI"], labels=labels, positions=(2.5, 2.9, 3.3), widths=0.3, patch_artist=True, showmeans=True, meanprops={'marker':'o', "markerfacecolor":"black", "markeredgecolor": "black"}, sym="+")
+    bplot3 = plt.boxplot(condition_dict["history"], labels=labels, positions=(4, 4.4, 4.8), widths=0.3, patch_artist=True, showmeans=True, meanprops={'marker':'o', "markerfacecolor":"black", "markeredgecolor": "black"}, sym="+")
 
 
     for bplot in (bplot, bplot2, bplot3):
@@ -54,7 +55,7 @@ def boxplot_three_groups_three_each(condition_dict, labels, colors, ylabel):
 
 def boxplot_three_groups_two_each(condition_dict, labels, colors, ylabel):
     # boxplot of the nine stages and their spent time of the task
-    x_positions_fmt = ["Early*", "Half", "Late"]
+    x_positions_fmt = ["Early", "Half", "Late"]
 
     bplot = plt.boxplot(condition_dict["early"], labels=labels, positions=(1, 1.4), widths=0.3, patch_artist=True, showmeans=True, meanprops={'marker':'o', "markerfacecolor":"black", "markeredgecolor": "black"}, sym="+")
     bplot2 = plt.boxplot(condition_dict["half"], labels=labels, positions=(2.5, 2.9), widths=0.3, patch_artist=True, showmeans=True, meanprops={'marker':'o', "markerfacecolor":"black", "markeredgecolor": "black"}, sym="+")
@@ -70,12 +71,12 @@ def boxplot_three_groups_two_each(condition_dict, labels, colors, ylabel):
     plt.xticks([i+0.8/2 for i in x_positions], x_positions_fmt)
 
     plt.ylabel(ylabel)
-    plt.legend(bplot["boxes"], labels, loc="best")
+    plt.legend(bplot["boxes"], labels, loc="best", prop={"size":12})
     plt.show()
 
 def boxplot_two_groups_two_each(condition_dict, labels, colors, ylabel):
     # boxplot of the nine stages and their spent time of the task
-    x_positions_fmt = ["MI", "Non-MI"]
+    x_positions_fmt = ["MI*", "Non-MI*"]
 
     bplot = plt.boxplot(condition_dict["MI"], labels=labels, positions=(1, 1.4), widths=0.3, patch_artist=True, showmeans=True, meanprops={'marker':'o', "markerfacecolor":"black", "markeredgecolor": "black"}, sym="+")
     bplot2 = plt.boxplot(condition_dict["non_MI"], labels=labels, positions=(2.5, 2.9), widths=0.3, patch_artist=True, showmeans=True, meanprops={'marker':'o', "markerfacecolor":"black", "markeredgecolor": "black"}, sym="+")
@@ -90,7 +91,7 @@ def boxplot_two_groups_two_each(condition_dict, labels, colors, ylabel):
     plt.xticks([i+0.8/2 for i in x_positions], x_positions_fmt)
 
     plt.ylabel(ylabel)
-    plt.legend(bplot["boxes"], labels, loc="best")
+    plt.legend(bplot["boxes"], labels, loc="lower left", prop={"size":11})
     plt.show()
 
 
@@ -438,26 +439,29 @@ def qualitative_feedback(total_eval_df):
     feedback_df = total_eval_df.dropna(subset=["comment_system", "comment_contextbot"], how="all", axis=0).drop_duplicates("id").loc[:, ["id", "stage", "spent_time", "final_msg", "interacted", "comment_system", "comment_contextbot"]]
     print(feedback_df[["comment_system"]].values)
 
+
 def boxplot_matrix_cxt_stage(df1, df2, df3, df4):
 
-    fig = plt.figure(figsize=(22,5))
+    fig = plt.figure(figsize=(21,5))
     gs1 = gridspec.GridSpec(1, 4)
     gs1.update(wspace=0.03)
     ax1 = plt.subplot(gs1[0, 0])
     ax2 = plt.subplot(gs1[0, 1])
     ax3 = plt.subplot(gs1[0, 2])
     ax4 = plt.subplot(gs1[0, 3])
+    print(df2)
+
     props = dict(boxes="silver", whiskers="black", medians="r", caps="black")
     df1.boxplot(ax=ax1, vert=False, showmeans=True, meanprops={'marker':'o', "markerfacecolor":"black", "markeredgecolor": "black"}, sym="+", color=props, patch_artist=True)
-    ax1.set_yticklabels(["Social", "Social&linguistic", "Social&linguistic\n&semantic", "Social&linguistic\n&semantic&cognitive", "All context\n&psychotherapy\ntechniques"])
+    ax1.set_yticklabels(["Social (N=2)", "Social&linguistic (N=4)", "Social&linguistic\n&semantic (N=2)", "Social&linguistic\n&semantic&cognitive\n(N=3)", "All context\n&psychotherapy\ntechniques (N=40)"])
 
-    ax1.set_xlabel("Consistency score")
+    ax1.set_xlabel("Consistency score (1-7)")
     df2.boxplot(ax=ax2, vert=False, showmeans=True, meanprops={'marker':'o', "markerfacecolor":"black", "markeredgecolor": "black"}, sym="+", color=props, patch_artist=True)
-    ax2.set_xlabel("Mean UEQ")
+    ax2.set_xlabel("Mean UEQ (1-7)")
     df3.boxplot(ax=ax3, vert=False, showmeans=True, meanprops={'marker':'o', "markerfacecolor":"black", "markeredgecolor": "black"}, sym="+", color=props, patch_artist=True)
-    ax3.set_xlabel("Mean task load")
+    ax3.set_xlabel("Mean task load (1-100)")
     df4.boxplot(ax=ax4, vert=False, showmeans=True, meanprops={'marker':'o', "markerfacecolor":"black", "markeredgecolor": "black"}, sym="+", color=props, patch_artist=True)
-    ax4.set_xlabel("Satisfaction score")
+    ax4.set_xlabel("Execution time (in seconds)")
 
 
     for ax in [ax1, ax2, ax3, ax4]:
@@ -477,7 +481,10 @@ def boxplot_cxt(b_name_df, dep_var):
     for i in range(0, len(cxt_type_dict)-1):
         box_dict[cxt_type_dict[i]] = list(b_name_df[b_name_df["id"].isin(b_name_df[(b_name_df[cxt_type_dict[i]]==1) & (b_name_df[cxt_type_dict[i+1]]==0)]["id"])][dep_var].values)
 
+
+
     box_dict["soc_ling"] = list(b_name_df[b_name_df["id"].isin(b_name_df[(b_name_df["interacted_ling_cxt"]==1) & (b_name_df["interacted_seman_cxt"]==0)]["id"])][dep_var].values)
+
     box_dict["soc_ling_seman"] = list(b_name_df[b_name_df["id"].isin(b_name_df[(b_name_df["interacted_ling_cxt"]==1) & (b_name_df["interacted_cog_cxt"]==0) & (b_name_df["interacted_seman_cxt"]==1)]["id"])][dep_var].values)
     box_dict["soc_ling_seman_cog"] = list(b_name_df[b_name_df["id"].isin(b_name_df[(b_name_df["interacted_ling_cxt"]==1) & (b_name_df["interacted_cog_cxt"]==1) & (b_name_df["interacted_prompt_cxt"]==0)]["id"])][dep_var].values)
     box_dict["all_cxt"] = list(b_name_df[b_name_df["id"].isin(b_name_df[(b_name_df["interacted_all_cxt"]==1)]["id"])][dep_var].values)
@@ -488,7 +495,6 @@ def boxplot_cxt(b_name_df, dep_var):
     df = pd.DataFrame({key:pd.Series(value) for key, value in box_dict.items() })
 
     return df
-
 
 
 if __name__ == "__main__":
@@ -502,33 +508,10 @@ if __name__ == "__main__":
 
     total_eval = total_eval_df(total_df, eval_df)
 
-    # merge consis, total with context df
-    total_eval_cxt = pd.merge(total_eval, b_name_df, on=["id"], how="left").drop_duplicates("id")
-    # only study the interacted workers for context types
-    total_eval_cxt = total_eval_cxt.loc[(total_eval_cxt["actual_interacted"]=="TRUE") & (total_eval_cxt["stage"]=="main_non_MI_late")]
-
-    boxplot_matrix_cxt_stage(boxplot_cxt(total_eval_cxt, "avg_consis"), boxplot_cxt(total_eval_cxt, "mean_ueq"), boxplot_cxt(total_eval_cxt, "mean_task_load"), boxplot_cxt(total_eval_cxt, "satis_score"))
-
-
-
-
-
-
-
-    # find_low_consis_patterns(total_eval, b_name_df)
-    # trade_off_consis_time(total_eval)
-
-
-    # task_load_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/task_load.csv", index_col=0)
+    task_load_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/task_load.csv", index_col=0)
     # ueq_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/ueq.csv", index_col=0)
 
 
-    # eval_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/sampled_eval_consis_psych.csv", index_col=0, usecols=["id", "stage", "interacted", "avg_consis"]).reset_index().dropna(axis=0, subset=["avg_consis"], how="all")
-
-    # eval_df = eval_df.drop(eval_df[(eval_df["stage"]=="non_MI_early") & (eval_df["interacted"]=="Yes, I did.") & (eval_df["avg_consis"]==1.7)].index)
-    # eval_df = eval_df.drop(eval_df[(eval_df["stage"]=="MI_late") & (eval_df["interacted"]=="No, I did not.") & (eval_df["avg_consis"]==2.0)].index)
-
-    # eval_df = eval_df.drop(eval_df[(eval_df["interacted"]=="No, I did not.") & (eval_df["avg_consis"]==1.3)].index)
 
     # all_interacted_worker = [35, 45, 63, 64, 70, 73, 91, 109, 118, 119, 120, 123, 125, 131, 137, 145, 185, 193, 223, 235, 236, 239, 242, 245, 246, 262, 269, 271, 276, 281, 282, 309, 321, 336, 341, 354, 356, 361, 373, 391]
     # eval_df = eval_df.loc[(eval_df["id"].isin(all_interacted_worker)) | (eval_df["interacted"] == "No, I did not.") | (eval_df["stage"] == "history_early") | (eval_df["stage"] == "history_half") | (eval_df["stage"] == "history_late")]
@@ -536,7 +519,7 @@ if __name__ == "__main__":
     # plt.boxplot([merge_dict["MI"], merge_dict["non_MI"]], labels=["MI", "Non_MI"], showfliers=True, showmeans=True, meanprops={'marker':'o', "markerfacecolor":"black", "markeredgecolor": "black"}, sym="+")
     # plt.show()
 
-    # boxplot_three_groups_three_each(within_group_test(eval_df, "avg_consis"), ["Early", "Half", "Late"], ['dimgrey', 'silver', 'whitesmoke'], "Consistency score")
+
 
 
 
@@ -572,6 +555,20 @@ if __name__ == "__main__":
     # MI_dict = between_groups_test(ueq_df, "mean_pragmatic")
     # boxplot_three_groups_three_each(MI_dict, ["MI", "Non-MI", "History"], ['dimgrey', 'silver', 'whitesmoke'], "Mean pragmatic score")
 
-    # boxplot_two_groups_two_each(within_group_test(task_load_df, "mean_task_load"), ["Interacted", "Not interacted"], ['dimgrey', 'silver'], "Mean task load")
+
     # boxplot_three_groups_two_each(within_group_test(task_load_df, "mean_task_load"), ["Non-MI-not-interacted", "History"], ['dimgrey', 'silver'], "Mean task load")
-    # boxplot_three_groups_three_each(between_groups_test(task_load_df, "spent_time"), ["Early", "Half", "Late"], ['dimgrey', 'silver', 'whitesmoke'], "Execution time (seconds)")
+    boxplot_three_groups_three_each(between_groups_test(task_load_df, "mean_task_load"), ["Early", "Half", "Late"], ['dimgrey', 'silver', 'whitesmoke'], "Mean task load")
+
+
+
+
+
+    # find_low_consis_patterns(total_eval, b_name_df)
+    # trade_off_consis_time(total_eval)
+
+    # # merge consis, total with context df
+    # total_eval_cxt = pd.merge(total_eval, b_name_df, on=["id"], how="left").drop_duplicates("id")
+    # # only study the interacted workers for context types
+    # total_eval_cxt = total_eval_cxt.loc[(total_eval_cxt["actual_interacted"]=="TRUE")]
+    #
+    # boxplot_matrix_cxt_stage(boxplot_cxt(total_eval_cxt, "avg_consis"), boxplot_cxt(total_eval_cxt, "mean_ueq"), boxplot_cxt(total_eval_cxt, "mean_task_load"), boxplot_cxt(total_eval_cxt, "spent_time"))

@@ -1,5 +1,6 @@
 from scipy import stats
 from scipy.stats import levene
+from statsmodels.stats.multicomp import pairwise_tukeyhsd
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -67,17 +68,19 @@ def between_groups_test(total_df, dependent_var):
     for key in condition_dict.keys():
         # for within task type and interacted types
         condition_l = list(total_df.loc[(total_df["stage"]=="main_"+key)].drop_duplicates(subset=["id"])[dependent_var].values)
-        condition_dict[key].extend(condition_l)
+        condition_dict[key].append(condition_l)
 
     # # # compare MI, non_MI, history conditions
     MI_dict = {"MI": [], "non_MI":[], "history":[]}
     for key in MI_dict.keys():
         for entry in ["early", "half", "late"]:
-            MI_dict[key].append(condition_dict[key+"_"+entry])
+            MI_dict[key].extend(condition_dict[key+"_"+entry])
+    print(MI_dict)
 
-    for key, value in MI_dict.items():
-        for i in range(len(value)):
-            print("Mean value and std of group %s :"%key, np.mean(value[i]), np.std(value[i]))
+    # for key, value in MI_dict.items():
+    #     for i in range(len(value)):
+    #         print("Mean value and std of group %s :"%key, np.mean(value[i]), np.std(value[i]))
+
     # # compare early, half, late conditions
     # entry_dict = {"early": [], "half":[], "late":[]}
     # for key in entry_dict.keys():
@@ -85,28 +88,27 @@ def between_groups_test(total_df, dependent_var):
     #         entry_dict[key].extend(condition_dict[entry+"_"+key])
 
 
-
-    post_hoc_dunn_test(MI_dict["history"])
     # dunn_df = total_df.loc[total_df["stage"].isin(["main_MI_half", "main_non_MI_half", "main_history_half"])]
     # print(sp.posthoc_dunn(dunn_df,  "mean_task_load","stage", "bonferroni"))
 
-    for key, value in MI_dict.items():
-        statistics, pvalue = stats.shapiro(value[0])
-        print("The Shapiro-Wilk statistic, p-value of group %s: "%key, statistics, pvalue)
-
-        statistics, pvalue = stats.shapiro(value[1])
-        print("The Shapiro-Wilk statistic, p-value of group %s: "%key, statistics, pvalue)
-
-        statistics, pvalue = stats.shapiro(value[2])
-        print("The Shapiro-Wilk statistic, p-value of group %s: "%key, statistics, pvalue)
 
 
-        # check if the variances of two conditions within one group are equal
-        print("Variance check:", stats.levene(value[0], value[1], value[2]))
-
-        # what if we use Mann-Whitney test
-        print("Kruskal-Wallis Test: ", stats.kruskal(value[0],value[1],value[2]))
-        print("\n\n")
+    # for key, value in MI_dict.items():
+    #     statistics, pvalue = stats.shapiro(value[0])
+    #     print("The Shapiro-Wilk statistic, p-value of group %s: "%key, statistics, pvalue)
+    #
+    #     statistics, pvalue = stats.shapiro(value[1])
+    #     print("The Shapiro-Wilk statistic, p-value of group %s: "%key, statistics, pvalue)
+    #
+    #
+    #
+    #
+    #     # check if the variances of two conditions within one group are equal
+    #     print("Variance check:", stats.levene(value[0], value[1]))
+    #
+    #     # what if we use Mann-Whitney test
+    #     print("Kruskal-Wallis Test: ", stats.kruskal(value[0],value[1]))
+    #     print("\n\n")
 
 
 
@@ -127,7 +129,7 @@ def within_group_test(total_df, dependent_var):
     for key in condition_dict.keys():
         for condition in condition_list:
         # for within task type and interacted types
-            condition_l = list(total_df[(total_df["stage"]==key) & (total_df["interacted"]==condition)][dependent_var].values)
+            condition_l = list(total_df[(total_df["stage"]=="main_"+key) & (total_df["interacted"]==condition)][dependent_var].values)
             condition_dict[key].append(condition_l)
 
     condition_dict["history_early"]=[]
@@ -153,17 +155,15 @@ def within_group_test(total_df, dependent_var):
         merge_dict[key].append((condition_dict["MI"+"_"+key][0])+(condition_dict["non_MI"+"_"+key][0]))
     for key in list(merge_dict.keys()):
         merge_dict[key].append((condition_dict["MI"+"_"+key][1])+(condition_dict["non_MI"+"_"+key][1]))
-    for key in list(merge_dict.keys()):
-        merge_dict[key].append(condition_dict["history_"+key])
+    # for key in list(merge_dict.keys()):
+    #     merge_dict[key].append(condition_dict["history_"+key])
     print(merge_dict)
 
     # merge_dict = {"MI":[], "non_MI":[]}
     # #
     # for key in list(merge_dict.keys()):
-    #     # merge_dict[key].append(condition_dict[key+"_early"][0]+(condition_dict[key+"_half"][0]) + (condition_dict[key+"_late"][0]))
-    #     for con in ["early", "half", "late"]:
-    #         merge_dict[key].append(condition_dict[key+"_"+con][1])
-
+    #     merge_dict[key].append(condition_dict[key+"_early"][0]+(condition_dict[key+"_half"][0]) + (condition_dict[key+"_late"][0]))
+    #
     # for key in list(merge_dict.keys()):
     #     merge_dict[key].append(condition_dict[key+"_early"][1]+(condition_dict[key+"_half"][1])+(condition_dict[key+"_late"][1]))
     # print(merge_dict)
@@ -175,7 +175,7 @@ def within_group_test(total_df, dependent_var):
     # print(stats.mannwhitneyu([6.0, 5.5, 5.5, 6.0], [4.5, 4.0, 4.0, 3.5, 5.5]))
 
 
-    # # check the normality of each list, use Shapiro-Wilk Test
+    # check the normality of each list, use Shapiro-Wilk Test
     # for key, value in merge_dict.items():
     #     statistics, pvalue = stats.shapiro(value[0])
     #     print("The Shapiro-Wilk statistic, p-value of interacted group %s: "%key, statistics, pvalue)
@@ -193,25 +193,31 @@ def within_group_test(total_df, dependent_var):
     #     print("Mann-Whitney Test: ", stats.mannwhitneyu(x=value[0], y=value[1], alternative='two-sided'))
     #     print("\n\n")
 
-    for key, value in merge_dict.items():
-        statistics, pvalue = stats.shapiro(value[0])
-        print("The Shapiro-Wilk statistic, p-value of group %s: "%key, statistics, pvalue)
+    # for key, value in merge_dict.items():
+    #     statistics, pvalue = stats.shapiro(value[0])
+    #     print("The Shapiro-Wilk statistic, p-value of group %s: "%key, statistics, pvalue)
+    #
+    #     statistics, pvalue = stats.shapiro(value[1])
+    #     print("The Shapiro-Wilk statistic, p-value of group %s: "%key, statistics, pvalue)
+    #
+    #     statistics, pvalue = stats.shapiro(value[2])
+    #     print("The Shapiro-Wilk statistic, p-value of group %s: "%key, statistics, pvalue)
+    #
+    #     # check if the variances of two conditions within one group are equal
+    #     print("Variance check:", stats.levene(value[0], value[1], value[2]))
+    #
+    #     # what if we use Mann-Whitney test
+    #     print("Kruskal-Wallis Test: ", stats.kruskal(value[0],value[1],value[2]))
+    #     print("\n\n")
+    #
+    #     print("ANOVA Test: ", stats.f_oneway(value[0],value[1],value[2]))
+    #
+    # dat = {
+    #     "groupd":["interacted"]*30+["not"]*30+["history"]*15,
+    #     "datad":[5.0, 4.7, 5.7, 4.7, 6.0, 5.7, 5.7, 4.7, 6.3, 4.7, 4.3, 5.0, 4.7, 5.0, 5.7, 6.3, 3.7, 5.3, 5.3, 6.0, 4.0, 6.0, 6.7, 4.0, 6.0, 5.0, 5.7, 5.0, 1.7, 5.7, 5.3, 2.3, 3.3, 3.7, 3.3, 3.7, 4.7, 3.7, 3.0, 4.0, 4.0, 4.0, 5.7, 6.0, 6.0, 5.0, 4.0, 3.7, 5.7, 4.7, 4.3, 3.0, 2.3, 3.7, 4.0, 3.0, 4.7, 2.3, 3.3, 3.3, 4.3, 5.3, 5.0, 5.7, 5.0, 2.7, 5.7, 3.3, 4.0, 4.0, 4.0, 3.0, 4.3, 4.3, 5.3]
+    # }
+    # print(pairwise_tukeyhsd(endog=dat['datad'] , groups=dat['groupd'], alpha=0.01))
 
-        statistics, pvalue = stats.shapiro(value[1])
-        print("The Shapiro-Wilk statistic, p-value of group %s: "%key, statistics, pvalue)
-
-        statistics, pvalue = stats.shapiro(value[2])
-        print("The Shapiro-Wilk statistic, p-value of group %s: "%key, statistics, pvalue)
-
-
-        # check if the variances of two conditions within one group are equal
-        print("Variance check:", stats.levene(value[0], value[1], value[2]))
-
-        # what if we use Mann-Whitney test
-        print("Kruskal-Wallis Test: ", stats.kruskal(value[0],value[1],value[2]))
-        print("\n\n")
-
-        print("ANOVA Test: ", stats.f_oneway(value[0],value[1],value[2]))
 
     return merge_dict
 
@@ -223,11 +229,16 @@ if __name__ == "__main__":
     #
     # between_groups_test(task_load_df, "spent_time")
     # eval_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/sampled_eval_consis_psych.csv", index_col=0, usecols=["id", "stage", "interacted", "avg_psych"]).reset_index().dropna(axis=0, subset=["avg_psych"], how="all")
-    # labeler1 = [6,	7,	6,	6,	3,	1	,5,	6,	3	,3	,6,	5,	4,	5	,6,	6,3,	5,	6	,6,	1,	5	,1,	3	,5,		3,	5,	3,	5,	7	,2,5,	5,	2,	6		,2	,5,	3	,1,	3,	3	,2,	1,	1		,6]
-    # labeler2 = [6,	7,	1,	7,	7,		3,	4,	5,	7,	7,		2,	5,	2,	6,	6, 7,	7,	5,	7,	3,		7,	6,	7,	7,	7,		4,	7,	3,	5,	6,7,	6,	3,	5,	6,	7,	4,	6,	7,	7	,7,	7,	7,	6,	5]
-    # print(cohen_kappa_score(labeler1, labeler2))
+
     # eval_df = eval_df.loc[eval_df["id"].isin([35, 45, 63, 64, 70, 73, 91, 109, 118, 119, 120, 123, 125, 131, 137, 145, 185, 193, 223, 235, 236, 239, 242, 245, 246, 262, 269, 271, 276, 281, 282, 309, 321, 336, 341, 354, 356, 361, 373, 391, 142, 333, 189, 14, 299, 71, 381, 293, 174, 97, 368, 217, 237, 256, 60, 132, 379, 216, 308, 1, 94, 121, 386, 314, 226, 9, 188, 352, 300, 69, 182, 359, 290, 34, 15, 68, 80, 157, 181, 218, 240, 263, 199, 280, 61,287, 307, 186, 10, 298, 130, 143, 102, 326, 171, 252, 99, 12, 351, 135, 96, 203, 383, 79, 172, 127, 207, 330, 158, 7, 111, 203, 17, 274, 24, 65, 296, 164, 213, 23, 285, 128, 75, 254, 332, 316, 232, 8, 347, 42, 248, 38, 206, 22, 110, 288, 155, 177, 339, 86, 67, 225, 329, 13, 29, 261, 107, 53, 267, 345, 148, 190, 355, 5, 224, 388, 144, 375, 66, 140, 312, 88, 208, 169, 57, 44, 295, 2, 335, 21, 162, 18, 72, 210, 294])]
-    within_group_test(task_load_df, "spent_time")
+    eval_df = pd.read_csv("/Users/sylvia/Documents/Netherlands/Course/MasterThesis/Experiments/final_data/sampled_eval_consis_psych.csv", index_col=0, usecols=["id", "stage", "interacted", "avg_psych"]).reset_index()
+
+    eval_df = eval_df.loc[eval_df["interacted"]=="Yes, I did."].dropna()
+    print(eval_df)
+    between_groups_test(eval_df, "avg_psych")
+
+
+
 
 
 
